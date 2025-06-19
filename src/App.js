@@ -91,11 +91,15 @@ function App() {
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
     if (e.touches && e.touches.length > 0) {
+      // タッチイベントの場合、スケールを考慮した座標計算
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
       return {
-        x: e.touches[0].clientX - rect.left,
-        y: e.touches[0].clientY - rect.top,
+        x: (e.touches[0].clientX - rect.left) * scaleX,
+        y: (e.touches[0].clientY - rect.top) * scaleY,
       };
     } else {
+      // マウスイベントの場合は既存の処理
       return {
         x: e.nativeEvent.offsetX,
         y: e.nativeEvent.offsetY,
@@ -107,12 +111,16 @@ function App() {
   const handleTouchStart = (e) => {
     e.preventDefault();
     const touch = e.touches[0];
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = touch.clientX - rect.left;
-    const y = touch.clientY - rect.top;
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    
+    // スケールを考慮した座標計算
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (touch.clientX - rect.left) * scaleX;
+    const y = (touch.clientY - rect.top) * scaleY;
     
     setIsDrawing(true);
-    const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     ctx.lineWidth = 4;
     ctx.strokeStyle = '#222';
@@ -129,11 +137,15 @@ function App() {
     if (!isDrawing) return;
     
     const touch = e.touches[0];
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = touch.clientX - rect.left;
-    const y = touch.clientY - rect.top;
-    
     const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    
+    // スケールを考慮した座標計算
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (touch.clientX - rect.left) * scaleX;
+    const y = (touch.clientY - rect.top) * scaleY;
+    
     const ctx = canvas.getContext('2d');
     ctx.lineWidth = 4;
     ctx.strokeStyle = '#222';
