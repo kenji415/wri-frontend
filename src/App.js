@@ -7,6 +7,8 @@ function App() {
   const [isDrawing, setIsDrawing] = useState(false);
   const [recognizedText, setRecognizedText] = useState('');
   const [inputText, setInputText] = useState('');
+  const [lastX, setLastX] = useState(0);
+  const [lastY, setLastY] = useState(0);
 
   // クイズ用state
   const [questions, setQuestions] = useState([]);
@@ -101,6 +103,76 @@ function App() {
     }
   };
 
+  // タッチイベントをマウスイベントに変換する関数
+  const handleTouchStart = (e) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+    
+    setIsDrawing(true);
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#222';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    setLastX(x);
+    setLastY(y);
+  };
+
+  const handleTouchMove = (e) => {
+    e.preventDefault();
+    if (!isDrawing) return;
+    
+    const touch = e.touches[0];
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+    
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#222';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    
+    // 線の継続性を保つ
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    
+    setLastX(x);
+    setLastY(y);
+    triggerAutoRecognize();
+  };
+
+  const handleTouchEnd = (e) => {
+    e.preventDefault();
+    setIsDrawing(false);
+    triggerAutoRecognize();
+  };
+
+  // タッチイベントリスナーを追加
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (canvas) {
+      canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+      canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+      canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+      
+      return () => {
+        canvas.removeEventListener('touchstart', handleTouchStart);
+        canvas.removeEventListener('touchmove', handleTouchMove);
+        canvas.removeEventListener('touchend', handleTouchEnd);
+      };
+    }
+  }, [isDrawing, lastX, lastY]);
+
   // Canvas描画処理
   const startDrawing = (e) => {
     setIsDrawing(true);
@@ -110,9 +182,10 @@ function App() {
     ctx.strokeStyle = '#222';
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.beginPath();
     const { x, y } = getPointerPos(e);
     ctx.moveTo(x, y);
+    setLastX(x);
+    setLastY(y);
   };
 
   const draw = (e) => {
@@ -126,6 +199,8 @@ function App() {
     const { x, y } = getPointerPos(e);
     ctx.lineTo(x, y);
     ctx.stroke();
+    setLastX(x);
+    setLastY(y);
     triggerAutoRecognize();
   };
 
@@ -666,9 +741,9 @@ function App() {
               onMouseMove={draw}
               onMouseUp={endDrawing}
               onMouseLeave={endDrawing}
-              onTouchStart={startDrawing}
-              onTouchMove={draw}
-              onTouchEnd={endDrawing}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
             />
           </div>
         </>
