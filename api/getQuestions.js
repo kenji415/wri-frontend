@@ -24,7 +24,7 @@ async function getQuestions() {
     id: row[0],
     category: row[1],
     subCategory: row[2],
-    detailCategory: row[3],
+    detailCategory: row[2],
     question: row[4],
     answer: row[5],
     type: row[6],
