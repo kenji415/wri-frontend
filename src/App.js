@@ -12,6 +12,7 @@ function App() {
 
   // クイズ用state
   const [questions, setQuestions] = useState([]);
+  const [originalQuestions, setOriginalQuestions] = useState([]); // 元のデータを保持
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -46,6 +47,10 @@ function App() {
   const [selectedDetailCategory, setSelectedDetailCategory] = useState(null);
   const [showCategoryButtons, setShowCategoryButtons] = useState(false);
 
+  // レベル選択用state
+  const [showLevelButtons, setShowLevelButtons] = useState(false);
+  const [selectedLevel, setSelectedLevel] = useState(null);
+
   // 問題データ取得
   useEffect(() => {
     const fetchQuestions = async () => {
@@ -53,27 +58,24 @@ function App() {
       try {
         const res = await fetch('https://wri-flask-backend.onrender.com/api/questions');
         const data = await res.json();
-        // console.log('selectedGenre:', selectedGenre);
-        // console.log('categories:', data.map(q => q.category));
-        // console.log('API response sample:', data.slice(0, 3));
-        // console.log('detailCategory samples from API:', data.slice(0, 10).map(q => ({ category: q.category, detailCategory: q.detailCategory })));
-        // console.log('First question structure:', data[0]);
-        // console.log('All fields in first question:', Object.keys(data[0]));
+        console.log('API response sample:', data.slice(0, 3));
+        console.log('First question structure:', data[0]);
+        console.log('All fields in first question:', Object.keys(data[0]));
         
         // 選択されたジャンルに基づいて問題をフィルタリング
         const filteredQuestions = data.filter(q => q.question && q.category && q.category.includes(selectedGenre));
+        console.log('filteredQuestions by genre:', filteredQuestions.length);
+        console.log('Sample filtered questions:', filteredQuestions.slice(0, 3));
+        
+        setOriginalQuestions(filteredQuestions); // 元のデータを保持
         setQuestions(filteredQuestions);
         
         // 詳細カテゴリを抽出（重複を除去）
         const uniqueDetailCategories = [...new Set(filteredQuestions.map(q => q.detailCategory).filter(Boolean))];
-        // console.log('filteredQuestions:', filteredQuestions.length);
-        // console.log('uniqueDetailCategories:', uniqueDetailCategories);
-        // console.log('detailCategory samples:', filteredQuestions.slice(0, 5).map(q => q.detailCategory));
+        console.log('uniqueDetailCategories:', uniqueDetailCategories);
         
-        // テスト用：詳細カテゴリが空の場合はダミーデータを追加
-        // const finalDetailCategories = uniqueDetailCategories.length > 0 ? uniqueDetailCategories : ['古代史', '中世史', '近世史', '近代史'];
         const finalDetailCategories = uniqueDetailCategories;
-        // console.log('finalDetailCategories:', finalDetailCategories);
+        console.log('finalDetailCategories:', finalDetailCategories);
         
         setDetailCategories(finalDetailCategories);
         
@@ -113,15 +115,22 @@ function App() {
     }
   }, [selectedGenre, detailCategories.length, selectedDetailCategory]);
 
-  // 詳細カテゴリが選択されたら、そのカテゴリの問題のみをフィルタリング
+  // 詳細カテゴリが選択されたら、レベル選択を表示
   useEffect(() => {
-    if (selectedDetailCategory && questions.length > 0) {
-      const filteredByDetail = questions.filter(q => q.detailCategory === selectedDetailCategory);
-      setQuestions(filteredByDetail);
-      setCurrentIndex(0);
-      setShowCategoryButtons(false);
+    if (selectedDetailCategory && originalQuestions.length > 0) {
+      console.log('Filtering by detail category:', selectedDetailCategory);
+      console.log('Original questions count:', originalQuestions.length);
       
-      // 先生の質問を追加（重複を防ぐため、既存のチャット履歴をリセット）
+      // 中分類でフィルタリング
+      const filteredByDetail = originalQuestions.filter(q => q.detailCategory === selectedDetailCategory);
+      console.log('Questions after detail category filtering:', filteredByDetail.length);
+      console.log('Sample questions after detail filtering:', filteredByDetail.slice(0, 3));
+      
+      setQuestions(filteredByDetail);
+      setShowCategoryButtons(false);
+      setShowLevelButtons(true);
+      
+      // 先生の質問を追加
       setChat([
         { 
           sender: 'seito', 
@@ -129,16 +138,67 @@ function App() {
         },
         { 
           sender: 'sensei', 
-          text: `${selectedGenre}の「${selectedDetailCategory}」について勉強しましょう！`, 
+          text: `${selectedGenre}の「${selectedDetailCategory}」について勉強しましょう！どのレベルをやりますか？`, 
+          face: 'tai-normal',
+          showLevelButtons: true,
+          levelButtons: ['レベル1', 'レベル2', 'レベル3']
+        }
+      ]);
+    }
+  }, [selectedDetailCategory, originalQuestions.length, selectedGenre]);
+
+  // レベルが選択されたら、そのレベルの問題のみをフィルタリング
+  useEffect(() => {
+    if (selectedLevel && questions.length > 0) {
+      const levelNumber = parseInt(selectedLevel.replace('レベル', ''));
+      console.log('Selected level:', selectedLevel, 'Level number:', levelNumber);
+      console.log('Questions before filtering:', questions.length);
+      console.log('Sample questions before filtering:', questions.slice(0, 3).map(q => ({ question: q.question, level: q.level, detailCategory: q.detailCategory })));
+      
+      // levelフィールドの値の型と内容を詳しく確認
+      console.log('Level field types and values:', questions.slice(0, 10).map(q => ({ 
+        level: q.level, 
+        levelType: typeof q.level, 
+        levelAsNumber: parseInt(q.level),
+        levelAsNumberType: typeof parseInt(q.level)
+      })));
+      
+      // 文字列比較でのフィルタリングを試す
+      const filteredByLevelString = questions.filter(q => q.level === levelNumber.toString());
+      console.log('Questions after string level filtering:', filteredByLevelString.length);
+      
+      // 数値比較でのフィルタリング
+      const filteredByLevel = questions.filter(q => q.level === levelNumber);
+      console.log('Questions after number level filtering:', filteredByLevel.length);
+      
+      // どちらかで結果が得られた方を使用
+      const finalFiltered = filteredByLevelString.length > 0 ? filteredByLevelString : filteredByLevel;
+      console.log('Final filtered questions:', finalFiltered.length);
+      console.log('Sample questions after filtering:', finalFiltered.slice(0, 3));
+      
+      setQuestions(finalFiltered);
+      setCurrentIndex(0);
+      setShowLevelButtons(false);
+      
+      // 先生の質問を追加
+      setChat(prev => [
+        ...prev,
+        { 
+          sender: 'seito', 
+          text: selectedLevel 
+        },
+        { 
+          sender: 'sensei', 
+          text: `${selectedGenre}の「${selectedDetailCategory}」の${selectedLevel}を始めましょう！`, 
           face: 'tai-normal' 
         }
       ]);
     }
-  }, [selectedDetailCategory, questions.length, selectedGenre]);
+  }, [selectedLevel, questions.length, selectedGenre, selectedDetailCategory]);
 
   // 問題が切り替わったらチャット履歴をリセットし、先生の出題を追加
   useEffect(() => {
-    if (questions.length > 0 && !showCategoryButtons && selectedDetailCategory && currentIndex === 0) {
+    if (questions.length > 0 && !showCategoryButtons && !showLevelButtons && selectedDetailCategory && selectedLevel && currentIndex === 0) {
       setChat(prev => [
         ...prev,
         { sender: 'sensei', text: questions[currentIndex].question, face: 'tai-normal' }
@@ -148,11 +208,11 @@ function App() {
       setRecognizedText('');
     }
     // eslint-disable-next-line
-  }, [currentIndex, questions.length, showCategoryButtons, selectedDetailCategory]);
+  }, [currentIndex, questions.length, showCategoryButtons, showLevelButtons, selectedDetailCategory, selectedLevel]);
 
   // 次の問題への移行
   useEffect(() => {
-    if (questions.length > 0 && !showCategoryButtons && selectedDetailCategory && currentIndex > 0) {
+    if (questions.length > 0 && !showCategoryButtons && !showLevelButtons && selectedDetailCategory && selectedLevel && currentIndex > 0) {
       setChat(prev => [
         ...prev,
         { sender: 'sensei', text: questions[currentIndex].question, face: 'tai-normal' }
@@ -162,7 +222,7 @@ function App() {
       setRecognizedText('');
     }
     // eslint-disable-next-line
-  }, [currentIndex, questions.length, showCategoryButtons, selectedDetailCategory]);
+  }, [currentIndex, questions.length, showCategoryButtons, showLevelButtons, selectedDetailCategory, selectedLevel]);
 
   // チャットが更新されたら自動で下までスクロール
   useEffect(() => {
@@ -835,6 +895,47 @@ function App() {
                       ))}
                     </div>
                   )}
+                  
+                  {/* 先生のメッセージにレベルボタンがある場合 */}
+                  {msg.sender === 'sensei' && msg.showLevelButtons && msg.levelButtons && (
+                    <div style={{
+                      marginTop: 12,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 8,
+                    }}>
+                      {msg.levelButtons.map((level, index) => (
+                        <button
+                          key={index}
+                          style={{
+                            background: '#4FC3F7',
+                            color: '#01579b',
+                            border: 'none',
+                            borderRadius: 8,
+                            padding: '8px 12px',
+                            fontSize: 14,
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                            transition: 'all 0.2s ease',
+                            width: '100%',
+                          }}
+                          onMouseOver={(e) => {
+                            e.target.style.background = '#29B6F6';
+                            e.target.style.transform = 'translateY(-1px)';
+                          }}
+                          onMouseOut={(e) => {
+                            e.target.style.background = '#4FC3F7';
+                            e.target.style.transform = 'translateY(0)';
+                          }}
+                          onClick={() => setSelectedLevel(level)}
+                        >
+                          {level}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -842,7 +943,7 @@ function App() {
           </div>
 
           {/* 入力エリア - カテゴリ選択中は非表示 */}
-          {!showCategoryButtons && (
+          {!showCategoryButtons && !showLevelButtons && (
             <>
               <div style={styles.headerRow}>
                 <input
