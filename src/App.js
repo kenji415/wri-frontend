@@ -62,6 +62,33 @@ function App() {
         console.log('First question structure:', data[0]);
         console.log('All fields in first question:', Object.keys(data[0]));
         
+        // 全フィールドの詳細を確認
+        console.log('Detailed field analysis:', data.slice(0, 3).map(q => ({
+          id: q.id,
+          question: q.question,
+          answer: q.answer,
+          category: q.category,
+          detailCategory: q.detailCategory,
+          subCategory: q.subCategory,
+          level: q.level,
+          type: q.type,
+          imageUrl: q.imageUrl,
+          // 可能性のあるヒントフィールド名をチェック
+          hint: q.hint,
+          hintText: q.hintText,
+          hint_message: q.hint_message,
+          tip: q.tip,
+          clue: q.clue
+        })));
+        
+        // ヒントフィールドの存在を特別に確認
+        console.log('Hint field check:', data.slice(0, 5).map(q => ({
+          id: q.id,
+          hasHint: 'hint' in q,
+          hintValue: q.hint,
+          hintType: typeof q.hint
+        })));
+        
         // 選択されたジャンルに基づいて問題をフィルタリング
         const filteredQuestions = data.filter(q => q.question && q.category && q.category.includes(selectedGenre));
         console.log('filteredQuestions by genre:', filteredQuestions.length);
@@ -176,6 +203,16 @@ function App() {
       console.log('Final filtered questions:', finalFiltered.length);
       console.log('Sample questions after filtering:', finalFiltered.slice(0, 3));
       
+      // フィルタリング後の問題データの詳細を確認
+      console.log('Detailed filtered questions:', finalFiltered.slice(0, 3).map(q => ({
+        id: q.id,
+        question: q.question,
+        answer: q.answer,
+        hint: q.hint,
+        hasHint: !!q.hint,
+        hintLength: q.hint ? q.hint.length : 0
+      })));
+      
       setQuestions(finalFiltered);
       setCurrentIndex(0);
       setShowLevelButtons(false);
@@ -201,7 +238,7 @@ function App() {
     if (questions.length > 0 && !showCategoryButtons && !showLevelButtons && selectedDetailCategory && selectedLevel && currentIndex === 0) {
       setChat(prev => [
         ...prev,
-        { sender: 'sensei', text: questions[currentIndex].question, face: 'tai-normal' }
+        { sender: 'sensei', text: questions[currentIndex].question, face: 'tai-normal', isQuestion: true }
       ]);
       clearCanvas();
       setInputText('');
@@ -215,7 +252,7 @@ function App() {
     if (questions.length > 0 && !showCategoryButtons && !showLevelButtons && selectedDetailCategory && selectedLevel && currentIndex > 0) {
       setChat(prev => [
         ...prev,
-        { sender: 'sensei', text: questions[currentIndex].question, face: 'tai-normal' }
+        { sender: 'sensei', text: questions[currentIndex].question, face: 'tai-normal', isQuestion: true }
       ]);
       clearCanvas();
       setInputText('');
@@ -434,9 +471,20 @@ function App() {
     ]);
     setEffect(isCorrect ? 'correct' : 'wrong');
     setTimeout(() => setEffect('none'), 500);
+    
+    // 正解表示後に少し待ってから次の問題へ
     setTimeout(() => {
       if (currentIndex + 1 < questions.length) {
-        setCurrentIndex(prev => prev + 1);
+        // 次の問題の前に少し間隔を開ける
+        setChat(prev => [
+          ...prev,
+          { sender: 'sensei', text: ' ', face: 'tai-normal' } // 空行を追加
+        ]);
+        
+        // さらに少し待ってから次の問題を表示
+        setTimeout(() => {
+          setCurrentIndex(prev => prev + 1);
+        }, 800);
       } else {
         setChat(prev => [
           ...prev,
@@ -444,7 +492,7 @@ function App() {
         ]);
         setIsFinished(true);
       }
-    }, 1000); // 1秒待って次へ
+    }, 1500); // 正解表示から1.5秒後に次の処理
   };
 
   // 次の問題へ
@@ -934,6 +982,101 @@ function App() {
                           {level}
                         </button>
                       ))}
+                    </div>
+                  )}
+                  
+                  {/* 問題出題時のヒント・わからないボタン */}
+                  {msg.sender === 'sensei' && 
+                   !msg.showButtons && 
+                   !msg.showLevelButtons && 
+                   questions[currentIndex] && 
+                   !isFinished && 
+                   msg.text === questions[currentIndex].question && (
+                    <div style={{
+                      marginTop: 12,
+                      display: 'flex',
+                      gap: 8,
+                      justifyContent: 'flex-end',
+                    }}>
+                      {/* ヒントボタン - J列にデータがある場合のみ表示 */}
+                      {questions[currentIndex].hint && questions[currentIndex].hint.trim() && (
+                        <button
+                          style={{
+                            background: '#90CAF9',
+                            color: '#01579b',
+                            border: 'none',
+                            borderRadius: 8,
+                            padding: '8px 12px',
+                            fontSize: 14,
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                            transition: 'all 0.2s ease',
+                            width: 96,
+                          }}
+                          onMouseOver={(e) => {
+                            e.target.style.background = '#64B5F6';
+                            e.target.style.transform = 'translateY(-1px)';
+                          }}
+                          onMouseOut={(e) => {
+                            e.target.style.background = '#90CAF9';
+                            e.target.style.transform = 'translateY(0)';
+                          }}
+                          onClick={() => {
+                            setChat(prev => [
+                              ...prev,
+                              { sender: 'sensei', text: `ヒント: ${questions[currentIndex].hint}`, face: 'tai-normal' }
+                            ]);
+                          }}
+                        >
+                          ヒント
+                        </button>
+                      )}
+                      
+                      {/* わからないボタン - 常に表示 */}
+                      <button
+                        style={{
+                          background: '#9E9E9E',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: 8,
+                          padding: '8px 12px',
+                          fontSize: 14,
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                          transition: 'all 0.2s ease',
+                          width: 96,
+                        }}
+                        onMouseOver={(e) => {
+                          e.target.style.background = '#757575';
+                          e.target.style.transform = 'translateY(-1px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.target.style.background = '#9E9E9E';
+                          e.target.style.transform = 'translateY(0)';
+                        }}
+                        onClick={() => {
+                          const answer = questions[currentIndex].answer.trim();
+                          setChat(prev => [
+                            ...prev,
+                            { sender: 'sensei', text: `正解は「${answer}」でした。`, face: 'tai-normal' }
+                          ]);
+                          setTimeout(() => {
+                            if (currentIndex + 1 < questions.length) {
+                              setCurrentIndex(prev => prev + 1);
+                            } else {
+                              setChat(prev => [
+                                ...prev,
+                                { sender: 'sensei', text: '全ての問題が終了しました！お疲れさまでした。', face: 'tai-normal' }
+                              ]);
+                              setIsFinished(true);
+                            }
+                          }, 1000);
+                        }}
+                      >
+                        わからない
+                      </button>
                     </div>
                   )}
                 </div>
