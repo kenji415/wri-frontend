@@ -85,12 +85,34 @@ def record_answer():
         question_id = data.get('questionId')
         is_correct = data.get('isCorrect')
         
+        print(f"Record answer request: userId={user_id}, userName={user_name}, questionId={question_id}, isCorrect={is_correct}")
+        
         # スプレッドシートの「user集計」タブを取得
         sh = gc.open_by_key(SPREADSHEET_ID)
-        worksheet = sh.worksheet('user集計')
+        
+        # ワークシートの存在確認
+        try:
+            worksheet = sh.worksheet('user集計')
+            print("user集計タブにアクセス成功")
+        except Exception as e:
+            print(f"user集計タブへのアクセスエラー: {e}")
+            # タブが存在しない場合は作成を試行
+            try:
+                worksheet = sh.add_worksheet(title='user集計', rows=1000, cols=10)
+                # ヘッダー行を追加
+                worksheet.append_row(['ユーザーID', 'ユーザー名', '問題ID', '回答回数', '正解回数'])
+                print("user集計タブを作成しました")
+            except Exception as create_error:
+                print(f"user集計タブの作成エラー: {create_error}")
+                return jsonify({"error": f"Failed to create user集計 tab: {create_error}"}), 500
         
         # 既存データを取得
-        existing_data = worksheet.get_all_values()
+        try:
+            existing_data = worksheet.get_all_values()
+            print(f"既存データ行数: {len(existing_data)}")
+        except Exception as e:
+            print(f"既存データ取得エラー: {e}")
+            return jsonify({"error": f"Failed to get existing data: {e}"}), 500
         
         # 既存のユーザー・問題の組み合わせを探す
         found = False
@@ -103,19 +125,33 @@ def record_answer():
                 new_answers = current_answers + 1
                 new_correct = current_correct + (1 if is_correct else 0)
                 
-                worksheet.update(f'D{i}', new_answers)
-                worksheet.update(f'E{i}', new_correct)
+                try:
+                    worksheet.update(f'D{i}', new_answers)
+                    worksheet.update(f'E{i}', new_correct)
+                    print(f"既存データ更新: 行{i}, 回答回数={new_answers}, 正解回数={new_correct}")
+                except Exception as e:
+                    print(f"データ更新エラー: {e}")
+                    return jsonify({"error": f"Failed to update data: {e}"}), 500
+                
                 found = True
                 break
         
         if not found:
             # 新規データを追加
             new_row = [user_id, user_name, question_id, 1, 1 if is_correct else 0]
-            worksheet.append_row(new_row)
+            try:
+                worksheet.append_row(new_row)
+                print(f"新規データ追加: {new_row}")
+            except Exception as e:
+                print(f"新規データ追加エラー: {e}")
+                return jsonify({"error": f"Failed to append new data: {e}"}), 500
         
         return jsonify({"success": True})
         
     except Exception as e:
+        print(f"record_answer API エラー: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
