@@ -51,6 +51,56 @@ function App() {
   const [showLevelButtons, setShowLevelButtons] = useState(false);
   const [selectedLevel, setSelectedLevel] = useState(null);
 
+  // ユーザー管理用state
+  const [userId, setUserId] = useState('');
+  const [userName, setUserName] = useState('');
+
+  // ユーザーIDの生成・管理
+  useEffect(() => {
+    // ローカルストレージからユーザーIDを取得
+    let storedUserId = localStorage.getItem('wri_user_id');
+    let storedUserName = localStorage.getItem('wri_user_name');
+    
+    if (!storedUserId) {
+      // 新しいユーザーIDを生成
+      storedUserId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      localStorage.setItem('wri_user_id', storedUserId);
+    }
+    
+    if (!storedUserName) {
+      // デフォルトユーザー名を設定
+      storedUserName = '生徒' + Math.floor(Math.random() * 1000);
+      localStorage.setItem('wri_user_name', storedUserName);
+    }
+    
+    setUserId(storedUserId);
+    setUserName(storedUserName);
+  }, []);
+
+  // 回答記録を送信する関数
+  const recordAnswer = async (questionId, isCorrect) => {
+    try {
+      const response = await fetch('https://wri-flask-backend.onrender.com/api/record_answer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: userId,
+          userName: userName,
+          questionId: questionId,
+          isCorrect: isCorrect
+        })
+      });
+      
+      if (!response.ok) {
+        console.error('回答記録の送信に失敗しました');
+      }
+    } catch (error) {
+      console.error('回答記録の送信エラー:', error);
+    }
+  };
+
   // 問題データ取得
   useEffect(() => {
     const fetchQuestions = async () => {
@@ -472,6 +522,9 @@ function App() {
     setEffect(isCorrect ? 'correct' : 'wrong');
     setTimeout(() => setEffect('none'), 500);
     
+    // 回答記録を送信
+    recordAnswer(questions[currentIndex].id, isCorrect);
+    
     // 正解表示後に少し待ってから次の問題へ
     setTimeout(() => {
       if (currentIndex + 1 < questions.length) {
@@ -493,6 +546,9 @@ function App() {
         setIsFinished(true);
       }
     }, 1500); // 正解表示から1.5秒後に次の処理
+
+    // 回答記録を送信
+    recordAnswer(questions[currentIndex].id, isCorrect);
   };
 
   // 次の問題へ
@@ -1062,6 +1118,10 @@ function App() {
                             ...prev,
                             { sender: 'sensei', text: `正解は「${answer}」でした。`, face: 'tai-normal' }
                           ]);
+                          
+                          // 回答記録を送信（不正解として記録）
+                          recordAnswer(questions[currentIndex].id, false);
+                          
                           setTimeout(() => {
                             if (currentIndex + 1 < questions.length) {
                               setCurrentIndex(prev => prev + 1);
