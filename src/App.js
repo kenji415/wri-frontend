@@ -528,16 +528,8 @@ function App() {
     // 正解表示後に少し待ってから次の問題へ
     setTimeout(() => {
       if (currentIndex + 1 < questions.length) {
-        // 次の問題の前に少し間隔を開ける
-        setChat(prev => [
-          ...prev,
-          { sender: 'sensei', text: ' ', face: 'tai-normal' } // 空行を追加
-        ]);
-        
-        // さらに少し待ってから次の問題を表示
-        setTimeout(() => {
-          setCurrentIndex(prev => prev + 1);
-        }, 800);
+        // 次の問題を表示
+        setCurrentIndex(prev => prev + 1);
       } else {
         setChat(prev => [
           ...prev,
