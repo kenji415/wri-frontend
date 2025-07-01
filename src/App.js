@@ -58,6 +58,11 @@ function App() {
   const [customQuestionCount, setCustomQuestionCount] = useState('');
   const [isRandomOrder, setIsRandomOrder] = useState(false);
 
+  // 復習モード用state
+  const [wrongQuestions, setWrongQuestions] = useState([]);
+  const [isReviewMode, setIsReviewMode] = useState(false);
+  const [reviewRound, setReviewRound] = useState(1);
+
   // ユーザー管理用state
   const [userId, setUserId] = useState('');
   const [userName, setUserName] = useState('');
@@ -87,6 +92,8 @@ function App() {
   // 回答記録を送信する関数
   const recordAnswer = async (questionId, isCorrect) => {
     try {
+      console.log('回答記録送信開始:', { userId, userName, questionId, isCorrect });
+      
       const response = await fetch('https://wri-flask-backend.onrender.com/api/record_answer', {
         method: 'POST',
         headers: {
@@ -101,11 +108,32 @@ function App() {
       });
       
       if (!response.ok) {
-        console.error('回答記録の送信に失敗しました');
+        const errorText = await response.text();
+        console.error('回答記録の送信に失敗しました:', response.status, errorText);
+      } else {
+        const result = await response.json();
+        console.log('回答記録送信成功:', result);
       }
     } catch (error) {
       console.error('回答記録の送信エラー:', error);
     }
+  };
+
+  // 間違えた問題を記録する関数
+  const recordWrongQuestion = (question) => {
+    console.log('記録しようとしている問題:', question);
+    setWrongQuestions(prev => {
+      console.log('現在の間違えた問題リスト:', prev);
+      // 既に記録されているかチェック
+      const exists = prev.find(q => q.id === question.id);
+      console.log('既に存在するか:', exists);
+      if (!exists) {
+        const newList = [...prev, question];
+        console.log('新しい間違えた問題リスト:', newList);
+        return newList;
+      }
+      return prev;
+    });
   };
 
   // 問題データ取得
@@ -166,7 +194,7 @@ function App() {
         // 先生の質問を表示
         setChat([{ 
           sender: 'sensei', 
-          text: `${selectedGenre}のどの分野を勉強しますか？`,
+          text: `${selectedGenre}やね！分野はどれにする？`,
           face: 'tai-normal',
           showButtons: true,
           buttons: finalDetailCategories
@@ -190,7 +218,7 @@ function App() {
     if (selectedGenre && !selectedDetailCategory && detailCategories.length > 0) {
       setChat([{ 
         sender: 'sensei', 
-        text: `${selectedGenre}のどの分野を勉強しますか？`,
+        text: `${selectedGenre}やね！分野はどれにする？`,
         face: 'tai-normal',
         showButtons: true,
         buttons: detailCategories
@@ -222,7 +250,7 @@ function App() {
         },
         { 
           sender: 'sensei', 
-          text: `${selectedGenre}の「${selectedDetailCategory}」について勉強しましょう！どのレベルをやりますか？`, 
+          text: `${selectedDetailCategory}やな。レベルはどうしよっか？`, 
           face: 'tai-normal',
           showLevelButtons: true,
           levelButtons: ['レベル1', 'レベル2', 'レベル3']
@@ -285,7 +313,7 @@ function App() {
         },
         { 
           sender: 'sensei', 
-          text: `${selectedGenre}の「${selectedDetailCategory}」の${selectedLevel}を始めましょう！何問やりますか？`, 
+          text: `${selectedDetailCategory}${selectedLevel}、はりきっていこかー！何問やる？`, 
           face: 'tai-normal',
           showQuestionCountButtons: true,
           questionCountButtons: [
@@ -336,7 +364,7 @@ function App() {
 
   // 問題が切り替わったらチャット履歴をリセットし、先生の出題を追加
   useEffect(() => {
-    if (questions.length > 0 && !showCategoryButtons && !showLevelButtons && !showQuestionCountButtons && selectedDetailCategory && selectedLevel && selectedQuestionCount && currentIndex === 0) {
+    if (questions.length > 0 && !showCategoryButtons && !showLevelButtons && !showQuestionCountButtons && selectedDetailCategory && selectedLevel && selectedQuestionCount && currentIndex === 0 && !isReviewMode) {
       setChat(prev => [
         ...prev,
         { sender: 'sensei', text: questions[currentIndex].question, face: 'tai-normal', isQuestion: true }
@@ -346,11 +374,11 @@ function App() {
       setRecognizedText('');
     }
     // eslint-disable-next-line
-  }, [currentIndex, questions.length, showCategoryButtons, showLevelButtons, showQuestionCountButtons, selectedDetailCategory, selectedLevel, selectedQuestionCount]);
+  }, [currentIndex, questions.length, showCategoryButtons, showLevelButtons, showQuestionCountButtons, selectedDetailCategory, selectedLevel, selectedQuestionCount, isReviewMode]);
 
   // 次の問題への移行
   useEffect(() => {
-    if (questions.length > 0 && !showCategoryButtons && !showLevelButtons && !showQuestionCountButtons && selectedDetailCategory && selectedLevel && selectedQuestionCount && currentIndex > 0) {
+    if (questions.length > 0 && !showCategoryButtons && !showLevelButtons && !showQuestionCountButtons && selectedDetailCategory && selectedLevel && selectedQuestionCount && currentIndex > 0 && !isReviewMode) {
       setChat(prev => [
         ...prev,
         { sender: 'sensei', text: questions[currentIndex].question, face: 'tai-normal', isQuestion: true }
@@ -360,7 +388,21 @@ function App() {
       setRecognizedText('');
     }
     // eslint-disable-next-line
-  }, [currentIndex, questions.length, showCategoryButtons, showLevelButtons, showQuestionCountButtons, selectedDetailCategory, selectedLevel, selectedQuestionCount]);
+  }, [currentIndex, questions.length, showCategoryButtons, showLevelButtons, showQuestionCountButtons, selectedDetailCategory, selectedLevel, selectedQuestionCount, isReviewMode]);
+
+  // 復習モードでの問題出題
+  useEffect(() => {
+    if (isReviewMode && questions.length > 0 && currentIndex > 0) {
+      setChat(prev => [
+        ...prev,
+        { sender: 'sensei', text: questions[currentIndex].question, face: 'tai-normal', isQuestion: true }
+      ]);
+      clearCanvas();
+      setInputText('');
+      setRecognizedText('');
+    }
+    // eslint-disable-next-line
+  }, [currentIndex, questions.length, isReviewMode]);
 
   // チャットが更新されたら自動で下までスクロール
   useEffect(() => {
@@ -573,6 +615,11 @@ function App() {
     setEffect(isCorrect ? 'correct' : 'wrong');
     setTimeout(() => setEffect('none'), 500);
     
+    // 間違えた問題を記録
+    if (!isCorrect) {
+      recordWrongQuestion(questions[currentIndex]);
+    }
+    
     // 回答記録を送信
     const currentQuestion = questions[currentIndex];
     let questionId;
@@ -589,13 +636,70 @@ function App() {
         // 次の問題を表示
         setCurrentIndex(prev => prev + 1);
       } else {
-        setChat(prev => [
-          ...prev,
-          { sender: 'sensei', text: '全ての問題が終了しました！お疲れさまでした。', face: 'tai-normal' }
-        ]);
-        setIsFinished(true);
+        // 全ての問題が終了
+        // 最後の問題の間違えた記録が反映されるように、少し待ってから判定
+        setTimeout(() => {
+          if (wrongQuestions.length > 0 && !isReviewMode) {
+            // 間違えた問題がある場合は復習モードを開始
+            startReviewMode(wrongQuestions);
+          } else if (wrongQuestions.length === 0 && isReviewMode) {
+            // 復習モードで全問正解
+            console.log('復習モード → 全問正解');
+            setChat(prev => [
+              ...prev,
+              { sender: 'sensei', text: 'おめでとうございます！全問正解です！', face: 'tai-good1' }
+            ]);
+            setWrongQuestions([]); // 全問正解時に間違えた問題リストをクリア
+            setIsFinished(true);
+          } else if (wrongQuestions.length > 0 && isReviewMode) {
+            // 復習モードで間違えた問題がある場合は次の復習ラウンドを開始
+            console.log('復習モード → 次の復習ラウンド開始');
+            startReviewMode(wrongQuestions); // 間違えた問題リストを直接渡す
+          } else {
+            // 通常の終了
+            console.log('通常の終了');
+            setChat(prev => [
+              ...prev,
+              { sender: 'sensei', text: '全ての問題が終了しました！お疲れさまでした。', face: 'tai-normal' }
+            ]);
+            setIsFinished(true);
+          }
+        }, 100); // 100ms待ってから判定
       }
     }, 1500); // 正解表示から1.5秒後に次の処理
+  };
+
+  // 復習モードを開始する関数
+  const startReviewMode = (wrongQuestionsToReview) => {
+    console.log('復習モード開始 - 現在の間違えた問題数:', wrongQuestionsToReview.length);
+    console.log('間違えた問題リスト:', wrongQuestionsToReview);
+    
+    setIsReviewMode(true);
+    setReviewRound(prev => prev + 1);
+    
+    // 渡された間違えた問題リストを使用
+    const currentWrongQuestions = [...wrongQuestionsToReview];
+    console.log('復習用の問題リスト:', currentWrongQuestions);
+    setQuestions(currentWrongQuestions);
+    
+    setCurrentIndex(0);
+    setChat(prev => [
+      ...prev,
+      { sender: 'sensei', text: `復習${reviewRound}回目です！間違えた問題をもう一度解いてみましょう。`, face: 'tai-normal' }
+    ]);
+    
+    // 復習モード開始時に最初の問題を出題
+    setTimeout(() => {
+      if (currentWrongQuestions.length > 0) {
+        setChat(prev => [
+          ...prev,
+          { sender: 'sensei', text: currentWrongQuestions[0].question, face: 'tai-normal', isQuestion: true }
+        ]);
+        clearCanvas();
+        setInputText('');
+        setRecognizedText('');
+      }
+    }, 1000); // 1秒後に最初の問題を出題
   };
 
   // 次の問題へ
@@ -1307,6 +1411,9 @@ function App() {
                             { sender: 'sensei', text: `正解は「${answer}」でした。`, face: 'tai-normal' }
                           ]);
                           
+                          // 間違えた問題を記録
+                          recordWrongQuestion(questions[currentIndex]);
+                          
                           // 回答記録を送信（不正解として記録）
                           const currentQuestion = questions[currentIndex];
                           let questionId;
@@ -1321,13 +1428,37 @@ function App() {
                             if (currentIndex + 1 < questions.length) {
                               setCurrentIndex(prev => prev + 1);
                             } else {
-                              setChat(prev => [
-                                ...prev,
-                                { sender: 'sensei', text: '全ての問題が終了しました！お疲れさまでした。', face: 'tai-normal' }
-                              ]);
-                              setIsFinished(true);
+                              // 全ての問題が終了
+                              // 最後の問題の間違えた記録が反映されるように、少し待ってから判定
+                              setTimeout(() => {
+                                if (wrongQuestions.length > 0 && !isReviewMode) {
+                                  // 間違えた問題がある場合は復習モードを開始
+                                  startReviewMode(wrongQuestions);
+                                } else if (wrongQuestions.length === 0 && isReviewMode) {
+                                  // 復習モードで全問正解
+                                  console.log('復習モード → 全問正解');
+                                  setChat(prev => [
+                                    ...prev,
+                                    { sender: 'sensei', text: 'おめでとうございます！全問正解です！', face: 'tai-good1' }
+                                  ]);
+                                  setWrongQuestions([]); // 全問正解時に間違えた問題リストをクリア
+                                  setIsFinished(true);
+                                } else if (wrongQuestions.length > 0 && isReviewMode) {
+                                  // 復習モードで間違えた問題がある場合は次の復習ラウンドを開始
+                                  console.log('復習モード → 次の復習ラウンド開始');
+                                  startReviewMode(wrongQuestions); // 間違えた問題リストを直接渡す
+                                } else {
+                                  // 通常の終了
+                                  console.log('通常の終了');
+                                  setChat(prev => [
+                                    ...prev,
+                                    { sender: 'sensei', text: '全ての問題が終了しました！お疲れさまでした。', face: 'tai-normal' }
+                                  ]);
+                                  setIsFinished(true);
+                                }
+                              }, 100); // 100ms待ってから判定
                             }
-                          }, 1000);
+                          }, 1500); // 正解表示から1.5秒後に次の処理
                         }}
                       >
                         わからない
