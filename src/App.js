@@ -51,6 +51,11 @@ function App() {
   const [showLevelButtons, setShowLevelButtons] = useState(false);
   const [selectedLevel, setSelectedLevel] = useState(null);
 
+  // 問題数選択用state
+  const [showQuestionCountButtons, setShowQuestionCountButtons] = useState(false);
+  const [selectedQuestionCount, setSelectedQuestionCount] = useState(null);
+  const [availableQuestionCount, setAvailableQuestionCount] = useState(0);
+
   // ユーザー管理用state
   const [userId, setUserId] = useState('');
   const [userName, setUserName] = useState('');
@@ -264,8 +269,10 @@ function App() {
       })));
       
       setQuestions(finalFiltered);
+      setAvailableQuestionCount(finalFiltered.length);
       setCurrentIndex(0);
       setShowLevelButtons(false);
+      setShowQuestionCountButtons(true);
       
       // 先生の質問を追加
       setChat(prev => [
@@ -276,16 +283,54 @@ function App() {
         },
         { 
           sender: 'sensei', 
-          text: `${selectedGenre}の「${selectedDetailCategory}」の${selectedLevel}を始めましょう！`, 
-          face: 'tai-normal' 
+          text: `${selectedGenre}の「${selectedDetailCategory}」の${selectedLevel}を始めましょう！何問やりますか？`, 
+          face: 'tai-normal',
+          showQuestionCountButtons: true,
+          questionCountButtons: [
+            '全部',
+            '5問',
+            '10問',
+            '15問',
+            '20問'
+          ]
         }
       ]);
     }
   }, [selectedLevel, questions.length, selectedGenre, selectedDetailCategory]);
 
+  // 問題数が選択された時の処理
+  useEffect(() => {
+    if (selectedQuestionCount && questions.length > 0) {
+      let finalQuestions = [...questions];
+      
+      if (selectedQuestionCount !== '全部') {
+        const count = parseInt(selectedQuestionCount.replace('問', ''));
+        finalQuestions = questions.slice(0, count);
+      }
+      
+      setQuestions(finalQuestions);
+      setCurrentIndex(0);
+      setShowQuestionCountButtons(false);
+      
+      // 先生の質問を追加
+      setChat(prev => [
+        ...prev,
+        { 
+          sender: 'seito', 
+          text: selectedQuestionCount 
+        },
+        { 
+          sender: 'sensei', 
+          text: `${selectedGenre}の「${selectedDetailCategory}」の${selectedLevel}を始めましょう！`, 
+          face: 'tai-normal' 
+        }
+      ]);
+    }
+  }, [selectedQuestionCount, questions.length, selectedGenre, selectedDetailCategory, selectedLevel]);
+
   // 問題が切り替わったらチャット履歴をリセットし、先生の出題を追加
   useEffect(() => {
-    if (questions.length > 0 && !showCategoryButtons && !showLevelButtons && selectedDetailCategory && selectedLevel && currentIndex === 0) {
+    if (questions.length > 0 && !showCategoryButtons && !showLevelButtons && !showQuestionCountButtons && selectedDetailCategory && selectedLevel && selectedQuestionCount && currentIndex === 0) {
       setChat(prev => [
         ...prev,
         { sender: 'sensei', text: questions[currentIndex].question, face: 'tai-normal', isQuestion: true }
@@ -295,11 +340,11 @@ function App() {
       setRecognizedText('');
     }
     // eslint-disable-next-line
-  }, [currentIndex, questions.length, showCategoryButtons, showLevelButtons, selectedDetailCategory, selectedLevel]);
+  }, [currentIndex, questions.length, showCategoryButtons, showLevelButtons, showQuestionCountButtons, selectedDetailCategory, selectedLevel, selectedQuestionCount]);
 
   // 次の問題への移行
   useEffect(() => {
-    if (questions.length > 0 && !showCategoryButtons && !showLevelButtons && selectedDetailCategory && selectedLevel && currentIndex > 0) {
+    if (questions.length > 0 && !showCategoryButtons && !showLevelButtons && !showQuestionCountButtons && selectedDetailCategory && selectedLevel && selectedQuestionCount && currentIndex > 0) {
       setChat(prev => [
         ...prev,
         { sender: 'sensei', text: questions[currentIndex].question, face: 'tai-normal', isQuestion: true }
@@ -309,7 +354,7 @@ function App() {
       setRecognizedText('');
     }
     // eslint-disable-next-line
-  }, [currentIndex, questions.length, showCategoryButtons, showLevelButtons, selectedDetailCategory, selectedLevel]);
+  }, [currentIndex, questions.length, showCategoryButtons, showLevelButtons, showQuestionCountButtons, selectedDetailCategory, selectedLevel, selectedQuestionCount]);
 
   // チャットが更新されたら自動で下までスクロール
   useEffect(() => {
@@ -1033,6 +1078,60 @@ function App() {
                     </div>
                   )}
                   
+                  {/* 先生のメッセージに問題数選択ボタンがある場合 */}
+                  {msg.sender === 'sensei' && msg.showQuestionCountButtons && msg.questionCountButtons && (
+                    <div style={{
+                      marginTop: 12,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 8,
+                    }}>
+                      {msg.questionCountButtons.map((count, index) => {
+                        const isAll = count === '全部';
+                        const isAvailable = isAll || parseInt(count.replace('問', '')) <= availableQuestionCount;
+                        
+                        return (
+                          <button
+                            key={index}
+                            style={{
+                              background: isAvailable ? '#4FC3F7' : '#ccc',
+                              color: isAvailable ? '#01579b' : '#666',
+                              border: 'none',
+                              borderRadius: 8,
+                              padding: '8px 12px',
+                              fontSize: 14,
+                              fontWeight: 'bold',
+                              cursor: isAvailable ? 'pointer' : 'not-allowed',
+                              textAlign: 'left',
+                              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                              transition: 'all 0.2s ease',
+                              width: '100%',
+                            }}
+                            onMouseOver={(e) => {
+                              if (isAvailable) {
+                                e.target.style.background = '#29B6F6';
+                                e.target.style.transform = 'translateY(-1px)';
+                              }
+                            }}
+                            onMouseOut={(e) => {
+                              if (isAvailable) {
+                                e.target.style.background = '#4FC3F7';
+                                e.target.style.transform = 'translateY(0)';
+                              }
+                            }}
+                            onClick={() => {
+                              if (isAvailable) {
+                                setSelectedQuestionCount(count);
+                              }
+                            }}
+                          >
+                            {isAll ? `全部(${availableQuestionCount}問)` : count}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  
                   {/* 問題出題時のヒント・わからないボタン */}
                   {msg.sender === 'sensei' && 
                    !msg.showButtons && 
@@ -1138,7 +1237,7 @@ function App() {
           </div>
 
           {/* 入力エリア - カテゴリ選択中は非表示 */}
-          {!showCategoryButtons && !showLevelButtons && (
+          {!showCategoryButtons && !showLevelButtons && !showQuestionCountButtons && (
             <>
               <div style={styles.headerRow}>
                 <input
