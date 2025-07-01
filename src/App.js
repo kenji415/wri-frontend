@@ -56,6 +56,7 @@ function App() {
   const [selectedQuestionCount, setSelectedQuestionCount] = useState(null);
   const [availableQuestionCount, setAvailableQuestionCount] = useState(0);
   const [customQuestionCount, setCustomQuestionCount] = useState('');
+  const [isRandomOrder, setIsRandomOrder] = useState(false);
 
   // ユーザー管理用state
   const [userId, setUserId] = useState('');
@@ -301,8 +302,16 @@ function App() {
       let finalQuestions = [...questions];
       
       if (selectedQuestionCount !== '全部') {
-        const count = parseInt(selectedQuestionCount.replace('問', ''));
+        const count = parseInt(selectedQuestionCount);
         finalQuestions = questions.slice(0, count);
+      }
+      
+      // ランダム順序が選択されている場合はシャッフル
+      if (isRandomOrder) {
+        // インデックス付きでシャッフル
+        const indexedQuestions = finalQuestions.map((q, index) => ({ ...q, originalIndex: index }));
+        const shuffled = indexedQuestions.sort(() => Math.random() - 0.5);
+        finalQuestions = shuffled;
       }
       
       setQuestions(finalQuestions);
@@ -323,7 +332,7 @@ function App() {
         }
       ]);
     }
-  }, [selectedQuestionCount, questions.length, selectedGenre, selectedDetailCategory, selectedLevel]);
+  }, [selectedQuestionCount, questions.length, selectedGenre, selectedDetailCategory, selectedLevel, isRandomOrder]);
 
   // 問題が切り替わったらチャット履歴をリセットし、先生の出題を追加
   useEffect(() => {
@@ -565,7 +574,14 @@ function App() {
     setTimeout(() => setEffect('none'), 500);
     
     // 回答記録を送信
-    recordAnswer(questions[currentIndex].id, isCorrect);
+    const currentQuestion = questions[currentIndex];
+    let questionId;
+    if (isRandomOrder && currentQuestion.originalIndex !== undefined) {
+      questionId = originalQuestions[currentQuestion.originalIndex].id;
+    } else {
+      questionId = currentQuestion.id;
+    }
+    recordAnswer(questionId, isCorrect);
     
     // 正解表示後に少し待ってから次の問題へ
     setTimeout(() => {
@@ -580,9 +596,6 @@ function App() {
         setIsFinished(true);
       }
     }, 1500); // 正解表示から1.5秒後に次の処理
-
-    // 回答記録を送信
-    recordAnswer(questions[currentIndex].id, isCorrect);
   };
 
   // 次の問題へ
@@ -1174,10 +1187,45 @@ function App() {
                               setSelectedQuestionCount(count);
                             }}
                           >
-                            {`全部(${availableQuestionCount}問)`}
+                            {`全部(${availableQuestionCount}問)で開始`}
                           </button>
                         );
                       })}
+
+                      {/* ランダム順序チェックボックス */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        marginTop: 8,
+                        padding: '8px 12px',
+                        background: '#f5f5f5',
+                        borderRadius: 8,
+                        border: '1px solid #e0e0e0',
+                      }}>
+                        <input
+                          type="checkbox"
+                          id="randomOrder"
+                          checked={isRandomOrder}
+                          onChange={(e) => setIsRandomOrder(e.target.checked)}
+                          style={{
+                            width: 16,
+                            height: 16,
+                            cursor: 'pointer',
+                          }}
+                        />
+                        <label
+                          htmlFor="randomOrder"
+                          style={{
+                            fontSize: 14,
+                            color: '#333',
+                            cursor: 'pointer',
+                            userSelect: 'none',
+                          }}
+                        >
+                          ランダム
+                        </label>
+                      </div>
                     </div>
                   )}
                   
@@ -1260,7 +1308,14 @@ function App() {
                           ]);
                           
                           // 回答記録を送信（不正解として記録）
-                          recordAnswer(questions[currentIndex].id, false);
+                          const currentQuestion = questions[currentIndex];
+                          let questionId;
+                          if (isRandomOrder && currentQuestion.originalIndex !== undefined) {
+                            questionId = originalQuestions[currentQuestion.originalIndex].id;
+                          } else {
+                            questionId = currentQuestion.id;
+                          }
+                          recordAnswer(questionId, false);
                           
                           setTimeout(() => {
                             if (currentIndex + 1 < questions.length) {
