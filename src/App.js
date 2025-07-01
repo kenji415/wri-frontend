@@ -55,6 +55,7 @@ function App() {
   const [showQuestionCountButtons, setShowQuestionCountButtons] = useState(false);
   const [selectedQuestionCount, setSelectedQuestionCount] = useState(null);
   const [availableQuestionCount, setAvailableQuestionCount] = useState(0);
+  const [customQuestionCount, setCustomQuestionCount] = useState('');
 
   // ユーザー管理用state
   const [userId, setUserId] = useState('');
@@ -287,11 +288,7 @@ function App() {
           face: 'tai-normal',
           showQuestionCountButtons: true,
           questionCountButtons: [
-            '全部',
-            '5問',
-            '10問',
-            '15問',
-            '20問'
+            '全部'
           ]
         }
       ]);
@@ -1086,46 +1083,98 @@ function App() {
                       flexDirection: 'column',
                       gap: 8,
                     }}>
+                      {/* 数字入力フィールド */}
+                      <div style={{
+                        display: 'flex',
+                        gap: 8,
+                        alignItems: 'center',
+                      }}>
+                        <input
+                          type="number"
+                          min="1"
+                          max={availableQuestionCount}
+                          value={customQuestionCount}
+                          onChange={(e) => setCustomQuestionCount(e.target.value)}
+                          placeholder={`1-${availableQuestionCount}の数字を入力`}
+                          style={{
+                            flex: 1,
+                            padding: '8px 12px',
+                            fontSize: 14,
+                            border: '1px solid #ccc',
+                            borderRadius: 8,
+                            outline: 'none',
+                          }}
+                        />
+                        <button
+                          style={{
+                            background: customQuestionCount && parseInt(customQuestionCount) > 0 && parseInt(customQuestionCount) <= availableQuestionCount ? '#4FC3F7' : '#ccc',
+                            color: customQuestionCount && parseInt(customQuestionCount) > 0 && parseInt(customQuestionCount) <= availableQuestionCount ? '#01579b' : '#666',
+                            border: 'none',
+                            borderRadius: 8,
+                            padding: '8px 16px',
+                            fontSize: 14,
+                            fontWeight: 'bold',
+                            cursor: customQuestionCount && parseInt(customQuestionCount) > 0 && parseInt(customQuestionCount) <= availableQuestionCount ? 'pointer' : 'not-allowed',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                            transition: 'all 0.2s ease',
+                            whiteSpace: 'nowrap',
+                          }}
+                          onMouseOver={(e) => {
+                            if (customQuestionCount && parseInt(customQuestionCount) > 0 && parseInt(customQuestionCount) <= availableQuestionCount) {
+                              e.target.style.background = '#29B6F6';
+                              e.target.style.transform = 'translateY(-1px)';
+                            }
+                          }}
+                          onMouseOut={(e) => {
+                            if (customQuestionCount && parseInt(customQuestionCount) > 0 && parseInt(customQuestionCount) <= availableQuestionCount) {
+                              e.target.style.background = '#4FC3F7';
+                              e.target.style.transform = 'translateY(0)';
+                            }
+                          }}
+                          onClick={() => {
+                            if (customQuestionCount && parseInt(customQuestionCount) > 0 && parseInt(customQuestionCount) <= availableQuestionCount) {
+                              setSelectedQuestionCount(parseInt(customQuestionCount).toString());
+                            }
+                          }}
+                        >
+                          開始
+                        </button>
+                      </div>
+                      
+                      {/* 全部ボタン */}
                       {msg.questionCountButtons.map((count, index) => {
                         const isAll = count === '全部';
-                        const isAvailable = isAll || parseInt(count.replace('問', '')) <= availableQuestionCount;
                         
                         return (
                           <button
                             key={index}
                             style={{
-                              background: isAvailable ? '#4FC3F7' : '#ccc',
-                              color: isAvailable ? '#01579b' : '#666',
+                              background: '#4FC3F7',
+                              color: '#01579b',
                               border: 'none',
                               borderRadius: 8,
                               padding: '8px 12px',
                               fontSize: 14,
                               fontWeight: 'bold',
-                              cursor: isAvailable ? 'pointer' : 'not-allowed',
+                              cursor: 'pointer',
                               textAlign: 'left',
                               boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
                               transition: 'all 0.2s ease',
                               width: '100%',
                             }}
                             onMouseOver={(e) => {
-                              if (isAvailable) {
-                                e.target.style.background = '#29B6F6';
-                                e.target.style.transform = 'translateY(-1px)';
-                              }
+                              e.target.style.background = '#29B6F6';
+                              e.target.style.transform = 'translateY(-1px)';
                             }}
                             onMouseOut={(e) => {
-                              if (isAvailable) {
-                                e.target.style.background = '#4FC3F7';
-                                e.target.style.transform = 'translateY(0)';
-                              }
+                              e.target.style.background = '#4FC3F7';
+                              e.target.style.transform = 'translateY(0)';
                             }}
                             onClick={() => {
-                              if (isAvailable) {
-                                setSelectedQuestionCount(count);
-                              }
+                              setSelectedQuestionCount(count);
                             }}
                           >
-                            {isAll ? `全部(${availableQuestionCount}問)` : count}
+                            {`全部(${availableQuestionCount}問)`}
                           </button>
                         );
                       })}
