@@ -63,8 +63,22 @@ def get_questions_from_sheet():
 def get_questions():
     try:
         questions = get_questions_from_sheet()
+        
+        # デバッグ用: 選択肢問題の確認
+        choice_questions = [q for q in questions if q.get('type') == '選択肢']
+        print(f"選択肢問題の数: {len(choice_questions)}")
+        if choice_questions:
+            print(f"最初の選択肢問題: {choice_questions[0]}")
+            print(f"選択肢1: '{choice_questions[0].get('choice1')}'")
+            print(f"選択肢2: '{choice_questions[0].get('choice2')}'")
+            print(f"選択肢3: '{choice_questions[0].get('choice3')}'")
+            print(f"選択肢4: '{choice_questions[0].get('choice4')}'")
+        
         return jsonify(questions)
     except Exception as e:
+        print(f"API エラー: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/vision_ocr', methods=['POST'])
@@ -134,8 +148,8 @@ def record_answer():
                 new_correct = current_correct + (1 if is_correct else 0)
                 
                 try:
-                    worksheet.update(f'D{i}', new_answers)
-                    worksheet.update(f'E{i}', new_correct)
+                    worksheet.update(f'D{i}', [[new_answers]])
+                    worksheet.update(f'E{i}', [[new_correct]])
                     print(f"既存データ更新: 行{i}, 回答回数={new_answers}, 正解回数={new_correct}")
                 except Exception as e:
                     print(f"データ更新エラー: {e}")
