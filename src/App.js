@@ -50,6 +50,7 @@ function App() {
   // レベル選択用state
   const [showLevelButtons, setShowLevelButtons] = useState(false);
   const [selectedLevel, setSelectedLevel] = useState(null);
+  const [expandedCategory, setExpandedCategory] = useState(null);
 
   // 問題数選択用state
   const [showQuestionCountButtons, setShowQuestionCountButtons] = useState(false);
@@ -191,14 +192,7 @@ function App() {
         
         setDetailCategories(finalDetailCategories);
         
-        // 先生の質問を表示
-        setChat([{ 
-          sender: 'sensei', 
-          text: `${selectedGenre}やね！分野はどれにする？`,
-          face: 'tai-normal',
-          showButtons: true,
-          buttons: finalDetailCategories
-        }]);
+        // 先生の質問を表示（チャット履歴は非表示）
         setShowCategoryButtons(true);
         
         setLoading(false);
@@ -239,23 +233,11 @@ function App() {
       console.log('Sample questions after detail filtering:', filteredByDetail.slice(0, 3));
       
       setQuestions(filteredByDetail);
-      setShowCategoryButtons(false);
-      setShowLevelButtons(true);
+      setExpandedCategory(selectedDetailCategory);
+      console.log('expandedCategory set to:', selectedDetailCategory);
       
-      // 先生の質問を追加
-      setChat([
-        { 
-          sender: 'seito', 
-          text: selectedDetailCategory 
-        },
-        { 
-          sender: 'sensei', 
-          text: `${selectedDetailCategory}やな。レベルはどうしよっか？`, 
-          face: 'tai-normal',
-          showLevelButtons: true,
-          levelButtons: ['レベル1', 'レベル2', 'レベル3']
-        }
-      ]);
+      // チャットは追加しない（ボタンでレベル選択するため）
+      console.log('Category selected, waiting for level selection');
     }
   }, [selectedDetailCategory, originalQuestions.length, selectedGenre]);
 
@@ -301,19 +283,17 @@ function App() {
       setQuestions(finalFiltered);
       setAvailableQuestionCount(finalFiltered.length);
       setCurrentIndex(0);
-      setShowLevelButtons(false);
+      setExpandedCategory(null);
+      setShowCategoryButtons(false);
       setShowQuestionCountButtons(true);
+      setSelectedQuestionCount(null); // 問題数選択をリセット
       
       // 先生の質問を追加
       setChat(prev => [
         ...prev,
         { 
-          sender: 'seito', 
-          text: selectedLevel 
-        },
-        { 
           sender: 'sensei', 
-          text: `${selectedDetailCategory}${selectedLevel}、はりきっていこかー！何問やる？`, 
+          text: `はりきっていこかー！何問やる？`, 
           face: 'tai-normal',
           showQuestionCountButtons: true,
           questionCountButtons: [
@@ -322,11 +302,14 @@ function App() {
         }
       ]);
     }
-  }, [selectedLevel, questions.length, selectedGenre, selectedDetailCategory]);
+  }, [selectedLevel, selectedGenre, selectedDetailCategory]);
 
   // 問題数が選択された時の処理
   useEffect(() => {
-    if (selectedQuestionCount && questions.length > 0) {
+    console.log('問題数選択useEffect実行 - selectedQuestionCount:', selectedQuestionCount, 'questions.length:', questions.length);
+    console.log('useEffect実行時のスタックトレース:', new Error().stack);
+    if (selectedQuestionCount) {
+      console.log('問題数選択:', selectedQuestionCount, '問題数:', questions.length);
       let finalQuestions = [...questions];
       
       if (selectedQuestionCount !== '全部') {
@@ -345,40 +328,60 @@ function App() {
       setQuestions(finalQuestions);
       setCurrentIndex(0);
       setShowQuestionCountButtons(false);
+      // selectedQuestionCountは保持する（リセットしない）
+      console.log('最終問題数:', finalQuestions.length);
       
       // 先生の質問を追加
       setChat(prev => [
         ...prev,
         { 
-          sender: 'seito', 
-          text: selectedQuestionCount 
-        },
-        { 
           sender: 'sensei', 
-          text: `${selectedGenre}の「${selectedDetailCategory}」の${selectedLevel}を始めましょう！`, 
+          text: `ほなはじめるで～`, 
           face: 'tai-normal' 
         }
       ]);
     }
-  }, [selectedQuestionCount, questions.length, selectedGenre, selectedDetailCategory, selectedLevel, isRandomOrder]);
+  }, [selectedQuestionCount, selectedLevel, isRandomOrder]);
 
   // 問題が切り替わったらチャット履歴をリセットし、先生の出題を追加
   useEffect(() => {
-    if (questions.length > 0 && !showCategoryButtons && !showLevelButtons && !showQuestionCountButtons && selectedDetailCategory && selectedLevel && selectedQuestionCount && currentIndex === 0 && !isReviewMode) {
-      setChat(prev => [
-        ...prev,
-        { sender: 'sensei', text: questions[currentIndex].question, face: 'tai-normal', isQuestion: true }
-      ]);
-      clearCanvas();
-      setInputText('');
-      setRecognizedText('');
+    if (questions.length > 0 && !showCategoryButtons && !showLevelButtons && !showQuestionCountButtons && selectedLevel && selectedQuestionCount && currentIndex === 0 && !isReviewMode) {
+      // 1秒待ってから第一問を表示
+      setTimeout(() => {
+        setChat(prev => [
+          ...prev,
+          { sender: 'sensei', text: questions[currentIndex].question, face: 'tai-normal', isQuestion: true }
+        ]);
+        clearCanvas();
+        setInputText('');
+        setRecognizedText('');
+        
+        // 次の問題の画像をプリロード
+        if (questions[currentIndex + 1] && questions[currentIndex + 1].questionImageUrl) {
+          const img = new Image();
+          img.src = convertGoogleDriveUrl(questions[currentIndex + 1].questionImageUrl);
+        }
+              }, 1000);
     }
     // eslint-disable-next-line
   }, [currentIndex, questions.length, showCategoryButtons, showLevelButtons, showQuestionCountButtons, selectedDetailCategory, selectedLevel, selectedQuestionCount, isReviewMode]);
 
   // 次の問題への移行
   useEffect(() => {
-    if (questions.length > 0 && !showCategoryButtons && !showLevelButtons && !showQuestionCountButtons && selectedDetailCategory && selectedLevel && selectedQuestionCount && currentIndex > 0 && !isReviewMode) {
+    console.log('次の問題表示useEffect実行 - 条件チェック:');
+    console.log('questions.length > 0:', questions.length > 0);
+    console.log('!showCategoryButtons:', !showCategoryButtons);
+    console.log('!showLevelButtons:', !showLevelButtons);
+    console.log('!showQuestionCountButtons:', !showQuestionCountButtons);
+    console.log('selectedLevel:', selectedLevel);
+    console.log('selectedQuestionCount:', selectedQuestionCount);
+    console.log('currentIndex > 0:', currentIndex > 0);
+    console.log('!isReviewMode:', !isReviewMode);
+    
+    if (questions.length > 0 && !showCategoryButtons && !showLevelButtons && !showQuestionCountButtons && selectedLevel && selectedQuestionCount && currentIndex > 0 && !isReviewMode) {
+      console.log('次の問題表示処理開始 - currentIndex:', currentIndex);
+      console.log('表示する問題:', questions[currentIndex]);
+      
       setChat(prev => [
         ...prev,
         { sender: 'sensei', text: questions[currentIndex].question, face: 'tai-normal', isQuestion: true }
@@ -386,13 +389,30 @@ function App() {
       clearCanvas();
       setInputText('');
       setRecognizedText('');
+      
+      // 次の問題の画像をプリロード
+      if (questions[currentIndex + 1] && questions[currentIndex + 1].questionImageUrl) {
+        const img = new Image();
+        img.src = convertGoogleDriveUrl(questions[currentIndex + 1].questionImageUrl);
+      }
+    } else {
+      console.log('条件が満たされていません');
     }
     // eslint-disable-next-line
   }, [currentIndex, questions.length, showCategoryButtons, showLevelButtons, showQuestionCountButtons, selectedDetailCategory, selectedLevel, selectedQuestionCount, isReviewMode]);
 
   // 復習モードでの問題出題
   useEffect(() => {
-    if (isReviewMode && questions.length > 0 && currentIndex > 0) {
+    console.log('🔄 復習モード問題表示useEffect発火:', {
+      isReviewMode,
+      questionsLength: questions.length,
+      currentIndex,
+      questions: questions
+    });
+    
+    if (isReviewMode && questions.length > 0 && currentIndex >= 0) {
+      console.log('✅ 復習モード - 問題表示:', currentIndex);
+      console.log('表示する問題:', questions[currentIndex]);
       setChat(prev => [
         ...prev,
         { sender: 'sensei', text: questions[currentIndex].question, face: 'tai-normal', isQuestion: true }
@@ -400,6 +420,18 @@ function App() {
       clearCanvas();
       setInputText('');
       setRecognizedText('');
+      
+      // 次の問題の画像をプリロード
+      if (questions[currentIndex + 1] && questions[currentIndex + 1].questionImageUrl) {
+        const img = new Image();
+        img.src = convertGoogleDriveUrl(questions[currentIndex + 1].questionImageUrl);
+      }
+    } else {
+      console.log('❌ 復習モード問題表示条件不成立:', {
+        isReviewMode,
+        questionsLength: questions.length,
+        currentIndex
+      });
     }
     // eslint-disable-next-line
   }, [currentIndex, questions.length, isReviewMode]);
@@ -632,75 +664,63 @@ function App() {
     
     // 正解表示後に少し待ってから次の問題へ
     setTimeout(() => {
+      console.log('次の問題への移行処理開始');
+      console.log('現在のインデックス:', currentIndex);
+      console.log('問題数:', questions.length);
+      console.log('次の問題があるか:', currentIndex + 1 < questions.length);
+      
       if (currentIndex + 1 < questions.length) {
         // 次の問題を表示
-        setCurrentIndex(prev => prev + 1);
+        console.log('次の問題に移行します');
+        setCurrentIndex(prev => {
+          console.log('currentIndex更新:', prev, '→', prev + 1);
+          return prev + 1;
+        });
       } else {
         // 全ての問題が終了
-        // 最後の問題の間違えた記録が反映されるように、少し待ってから判定
-        setTimeout(() => {
-          if (wrongQuestions.length > 0 && !isReviewMode) {
-            // 間違えた問題がある場合は復習モードを開始
-            startReviewMode(wrongQuestions);
-          } else if (wrongQuestions.length === 0 && isReviewMode) {
-            // 復習モードで全問正解
-            console.log('復習モード → 全問正解');
-            setChat(prev => [
-              ...prev,
-              { sender: 'sensei', text: 'おめでとうございます！全問正解です！', face: 'tai-good1' }
-            ]);
-            setWrongQuestions([]); // 全問正解時に間違えた問題リストをクリア
-            setIsFinished(true);
-          } else if (wrongQuestions.length > 0 && isReviewMode) {
-            // 復習モードで間違えた問題がある場合は次の復習ラウンドを開始
-            console.log('復習モード → 次の復習ラウンド開始');
-            startReviewMode(wrongQuestions); // 間違えた問題リストを直接渡す
-          } else {
-            // 通常の終了
-            console.log('通常の終了');
-            setChat(prev => [
-              ...prev,
-              { sender: 'sensei', text: '全ての問題が終了しました！お疲れさまでした。', face: 'tai-normal' }
-            ]);
-            setIsFinished(true);
-          }
-        }, 100); // 100ms待ってから判定
+        console.log('全ての問題が終了しました');
+        setQuestions([]); // ここでquestionsを空にする
+        // setTimeoutでの復習ラウンド判定はuseEffectに一元化したのでここでは何もしない
       }
     }, 1500); // 正解表示から1.5秒後に次の処理
   };
 
   // 復習モードを開始する関数
-  const startReviewMode = (wrongQuestionsToReview) => {
-    console.log('復習モード開始 - 現在の間違えた問題数:', wrongQuestionsToReview.length);
-    console.log('間違えた問題リスト:', wrongQuestionsToReview);
-    
-    setIsReviewMode(true);
-    setReviewRound(prev => prev + 1);
-    
-    // 渡された間違えた問題リストを使用
-    const currentWrongQuestions = [...wrongQuestionsToReview];
-    console.log('復習用の問題リスト:', currentWrongQuestions);
-    setQuestions(currentWrongQuestions);
-    
-    setCurrentIndex(0);
-    setChat(prev => [
-      ...prev,
-      { sender: 'sensei', text: `復習${reviewRound}回目です！間違えた問題をもう一度解いてみましょう。`, face: 'tai-normal' }
-    ]);
-    
-    // 復習モード開始時に最初の問題を出題
-    setTimeout(() => {
-      if (currentWrongQuestions.length > 0) {
+  const startReviewMode = () => {
+  setIsReviewMode(true);
+  setReviewRound(prev => prev + 1);
+};
+
+  // 復習モード開始時にquestionsをセット
+  useEffect(() => {
+    if (isReviewMode && questions.length === 0 && wrongQuestions.length > 0) {
+      console.log('🔄 復習モード問題表示useEffect発火:', {
+        isReviewMode,
+        questionsLength: questions.length,
+        currentIndex,
+        questions: questions
+      });
+      
+      // 復習モードの条件をチェック
+      if (isReviewMode && questions.length === 0 && wrongQuestions.length > 0) {
+        console.log('✅ 復習モード - 問題表示:', currentIndex);
+        console.log('表示する問題:', wrongQuestions[currentIndex]);
+        
+        setQuestions([...wrongQuestions]);
+        setCurrentIndex(0);
         setChat(prev => [
           ...prev,
-          { sender: 'sensei', text: currentWrongQuestions[0].question, face: 'tai-normal', isQuestion: true }
+          { sender: 'sensei', text: `復習${reviewRound + 1}回目です！間違えた問題をもう一度解いてみましょう。`, face: 'tai-normal' }
         ]);
-        clearCanvas();
-        setInputText('');
-        setRecognizedText('');
+      } else {
+        console.log('❌ 復習モード問題表示条件不成立:', {
+          isReviewMode,
+          questionsLength: questions.length,
+          currentIndex
+        });
       }
-    }, 1000); // 1秒後に最初の問題を出題
-  };
+    }
+  }, [isReviewMode, wrongQuestions, reviewRound]);
 
   // 次の問題へ
   const nextQuestion = () => {
@@ -751,6 +771,14 @@ function App() {
 
   // 選択肢ボタンをクリックした時の処理
   const handleChoiceClick = (selectedChoice) => {
+    console.log('🎯 回答処理開始:', {
+      selectedChoice,
+      isReviewMode,
+      questionsLength: questions.length,
+      currentIndex,
+      wrongQuestionsLength: wrongQuestions.length
+    });
+    
     if (isFinished) return;
     
     const currentQuestion = questions[currentIndex];
@@ -779,6 +807,22 @@ function App() {
       recordWrongQuestion(currentQuestion);
     }
     
+    // 復習モードで正解した場合は、間違えた問題リストから削除
+    console.log('復習モード正解処理 - isCorrect:', isCorrect, 'isReviewMode:', isReviewMode, 'currentQuestion.id:', currentQuestion.id);
+    if (isCorrect && isReviewMode) {
+      console.log('復習モード - 正解した問題を削除:', currentQuestion.id);
+      setWrongQuestions(prev => {
+        console.log('削除前の間違えた問題リスト:', prev);
+        const newList = prev.filter(q => q.id !== currentQuestion.id);
+        console.log('削除後の間違えた問題リスト:', newList);
+        return newList;
+      });
+    } else if (isCorrect) {
+      console.log('通常モードで正解 - 削除処理なし');
+    } else {
+      console.log('不正解 - 削除処理なし');
+    }
+    
     // 回答記録を送信
     let questionId;
     if (isRandomOrder && currentQuestion.originalIndex !== undefined) {
@@ -789,42 +833,41 @@ function App() {
     recordAnswer(questionId, isCorrect);
     
     // 正解表示後に少し待ってから次の問題へ
-    setTimeout(() => {
+      setTimeout(() => {
+      console.log('次の問題への移行処理開始');
+      console.log('現在のインデックス:', currentIndex);
+      console.log('問題数:', questions.length);
+      console.log('次の問題があるか:', currentIndex + 1 < questions.length);
+      
       if (currentIndex + 1 < questions.length) {
         // 次の問題を表示
-        setCurrentIndex(prev => prev + 1);
+        console.log('次の問題に移行します');
+        setCurrentIndex(prev => {
+          console.log('currentIndex更新:', prev, '→', prev + 1);
+          return prev + 1;
+        });
       } else {
         // 全ての問題が終了
-        // 最後の問題の間違えた記録が反映されるように、少し待ってから判定
-        setTimeout(() => {
-          if (wrongQuestions.length > 0 && !isReviewMode) {
-            // 間違えた問題がある場合は復習モードを開始
-            startReviewMode(wrongQuestions);
-          } else if (wrongQuestions.length === 0 && isReviewMode) {
-            // 復習モードで全問正解
-            console.log('復習モード → 全問正解');
-            setChat(prev => [
-              ...prev,
-              { sender: 'sensei', text: 'おめでとうございます！全問正解です！', face: 'tai-good1' }
-            ]);
-            setWrongQuestions([]); // 全問正解時に間違えた問題リストをクリア
-            setIsFinished(true);
-          } else if (wrongQuestions.length > 0 && isReviewMode) {
-            // 復習モードで間違えた問題がある場合は次の復習ラウンドを開始
-            console.log('復習モード → 次の復習ラウンド開始');
-            startReviewMode(wrongQuestions); // 間違えた問題リストを直接渡す
-          } else {
-            // 通常の終了
-            console.log('通常の終了');
-            setChat(prev => [
-              ...prev,
-              { sender: 'sensei', text: '全ての問題が終了しました！お疲れさまでした。', face: 'tai-normal' }
-            ]);
-            setIsFinished(true);
-          }
-        }, 100); // 100ms待ってから判定
+        console.log('全ての問題が終了しました');
+        setQuestions([]); // ここでquestionsを空にする
+        // setTimeoutでの復習ラウンド判定はuseEffectに一元化したのでここでは何もしない
       }
     }, 1500); // 正解表示から1.5秒後に次の処理
+  };
+
+  // Google DriveのURLを直接画像URLに変換する関数
+  const convertGoogleDriveUrl = (url) => {
+    if (!url) return '';
+    
+    // Google Driveの共有リンクを直接画像URLに変換
+    const match = url.match(/\/file\/d\/([a-zA-Z0-9-_]+)/);
+    if (match) {
+      const fileId = match[1];
+      // バックエンドのAPIを使用して画像を取得
+      return `https://wri-flask-backend.onrender.com/api/get_image/${fileId}`;
+    }
+    
+    return url;
   };
 
   // 選択肢を取得する関数
@@ -963,6 +1006,68 @@ function App() {
       objectFit: 'contain',
     },
   };
+
+  // 状態変更の監視用useEffect
+  useEffect(() => {
+    console.log('🔍 状態変更監視 - isReviewMode:', isReviewMode);
+  }, [isReviewMode]);
+
+  useEffect(() => {
+    console.log('🔍 状態変更監視 - questions:', questions.length, 'questions:', questions);
+  }, [questions]);
+
+  useEffect(() => {
+    console.log('🔍 状態変更監視 - wrongQuestions:', wrongQuestions.length, 'wrongQuestions:', wrongQuestions);
+  }, [wrongQuestions]);
+
+  useEffect(() => {
+    console.log('🔍 状態変更監視 - currentIndex:', currentIndex);
+  }, [currentIndex]);
+
+  // 復習モードのラウンド遷移をuseEffectで管理
+  useEffect(() => {
+    console.log('復習ラウンド遷移useEffect実行:', {
+      isReviewMode,
+      questionsLength: questions.length,
+      wrongQuestionsLength: wrongQuestions.length,
+      questions: questions
+    });
+    
+    // 通常モード終了時に復習モードへ
+    if (!isReviewMode && questions.length === 0 && wrongQuestions.length > 0) {
+      console.log('通常モード終了→復習モード開始:', wrongQuestions);
+      startReviewMode();
+      return;
+    }
+    // 復習モードのラウンド遷移
+    if (isReviewMode && questions.length === 0) {
+      if (wrongQuestions.length === 0) {
+        setChat(prev => [
+          ...prev,
+          { sender: 'sensei', text: 'おめでとうございます！全問正解です！', face: 'tai-good1' }
+        ]);
+        setIsFinished(true);
+      } else {
+        // questionsを一度空にしてから復習ラウンドを開始
+        setQuestions([]);
+        // 最新のwrongQuestionsを確実に取得するため、少し遅延させる
+        setTimeout(() => {
+          console.log('復習ラウンド継続(setTimeout) - 最新のwrongQuestions:', wrongQuestions);
+          // wrongQuestionsの長さを再チェックして、0でない場合のみ継続
+          if (wrongQuestions.length > 0) {
+            startReviewMode();
+          } else {
+            // 全問正解の場合
+            setChat(prev => [
+              ...prev,
+              { sender: 'sensei', text: 'おめでとうございます！全問正解です！', face: 'tai-good1' }
+            ]);
+            setIsFinished(true);
+          }
+        }, 200);
+      }
+    }
+  }, [questions.length, wrongQuestions, isReviewMode]);
 
   if (showTop) {
     return (
@@ -1214,34 +1319,131 @@ function App() {
                       gap: 8,
                     }}>
                       {msg.buttons.map((category, index) => (
-                        <button
-                          key={index}
-                          style={{
-                            background: '#4FC3F7',
-                            color: '#01579b',
-                            border: 'none',
-                            borderRadius: 8,
-                            padding: '8px 12px',
-                            fontSize: 14,
-                            fontWeight: 'bold',
-                            cursor: 'pointer',
-                            textAlign: 'left',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                            transition: 'all 0.2s ease',
-                            width: '100%',
-                          }}
-                          onMouseOver={(e) => {
-                            e.target.style.background = '#29B6F6';
-                            e.target.style.transform = 'translateY(-1px)';
-                          }}
-                          onMouseOut={(e) => {
-                            e.target.style.background = '#4FC3F7';
-                            e.target.style.transform = 'translateY(0)';
-                          }}
-                          onClick={() => setSelectedDetailCategory(category)}
-                        >
-                          {category}
-                        </button>
+                        <div key={index}>
+                          <button
+                            style={{
+                              background: '#4FC3F7',
+                              color: '#01579b',
+                              border: 'none',
+                              borderRadius: 8,
+                              padding: '8px 12px',
+                              fontSize: 14,
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                              transition: 'all 0.2s ease',
+                              width: '100%',
+                            }}
+                            onMouseOver={(e) => {
+                              e.target.style.background = '#29B6F6';
+                              e.target.style.transform = 'translateY(-1px)';
+                            }}
+                            onMouseOut={(e) => {
+                              e.target.style.background = '#4FC3F7';
+                              e.target.style.transform = 'translateY(0)';
+                            }}
+                            onClick={() => {
+                              console.log('Category clicked:', category);
+                              setSelectedDetailCategory(category);
+                            }}
+                          >
+                            {category}
+                          </button>
+                          
+                          {/* 展開されたカテゴリのレベルボタン */}
+                          {expandedCategory === category && (
+                            <div style={{
+                              marginTop: 4,
+                              marginLeft: 16,
+                              display: 'flex',
+                              flexDirection: 'row',
+                              gap: 8,
+                            }}>
+                              <button
+                                style={{
+                                  background: '#90CAF9',
+                                  color: '#01579b',
+                                  border: 'none',
+                                  borderRadius: 6,
+                                  padding: '6px 10px',
+                                  fontSize: 12,
+                                  fontWeight: 'bold',
+                                  cursor: 'pointer',
+                                  textAlign: 'left',
+                                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                                  transition: 'all 0.2s ease',
+                                  width: '100%',
+                                }}
+                                onMouseOver={(e) => {
+                                  e.target.style.background = '#64B5F6';
+                                  e.target.style.transform = 'translateY(-1px)';
+                                }}
+                                onMouseOut={(e) => {
+                                  e.target.style.background = '#90CAF9';
+                                  e.target.style.transform = 'translateY(0)';
+                                }}
+                                onClick={() => setSelectedLevel('レベル1')}
+                              >
+                                基礎
+                              </button>
+                              <button
+                                style={{
+                                  background: '#90CAF9',
+                                  color: '#01579b',
+                                  border: 'none',
+                                  borderRadius: 6,
+                                  padding: '6px 10px',
+                                  fontSize: 12,
+                                  fontWeight: 'bold',
+                                  cursor: 'pointer',
+                                  textAlign: 'left',
+                                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                                  transition: 'all 0.2s ease',
+                                  width: '100%',
+                                }}
+                                onMouseOver={(e) => {
+                                  e.target.style.background = '#64B5F6';
+                                  e.target.style.transform = 'translateY(-1px)';
+                                }}
+                                onMouseOut={(e) => {
+                                  e.target.style.background = '#90CAF9';
+                                  e.target.style.transform = 'translateY(0)';
+                                }}
+                                onClick={() => setSelectedLevel('レベル2')}
+                              >
+                                標準
+                              </button>
+                              <button
+                                style={{
+                                  background: '#90CAF9',
+                                  color: '#01579b',
+                                  border: 'none',
+                                  borderRadius: 6,
+                                  padding: '6px 10px',
+                                  fontSize: 12,
+                                  fontWeight: 'bold',
+                                  cursor: 'pointer',
+                                  textAlign: 'left',
+                                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                                  transition: 'all 0.2s ease',
+                                  width: '100%',
+                                }}
+                                onMouseOver={(e) => {
+                                  e.target.style.background = '#64B5F6';
+                                  e.target.style.transform = 'translateY(-1px)';
+                                }}
+                                onMouseOut={(e) => {
+                                  e.target.style.background = '#90CAF9';
+                                  e.target.style.transform = 'translateY(0)';
+                                }}
+                                onClick={() => setSelectedLevel('レベル3')}
+                              >
+                                応用
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       ))}
                     </div>
                   )}
@@ -1383,6 +1585,7 @@ function App() {
                               e.target.style.transform = 'translateY(0)';
                             }}
                             onClick={() => {
+                              console.log('問題数選択ボタンクリック:', count);
                               setSelectedQuestionCount(count);
                             }}
                           >
@@ -1428,6 +1631,39 @@ function App() {
                     </div>
                   )}
                   
+                  {/* 問題画像の表示 */}
+                  {msg.sender === 'sensei' && 
+                   !msg.showButtons && 
+                   !msg.showLevelButtons && 
+                   questions[currentIndex] && 
+                   !isFinished && 
+                   msg.text === questions[currentIndex].question &&
+                   questions[currentIndex].questionImageUrl && (
+                    <div style={{
+                      marginTop: 8,
+                      textAlign: 'center',
+                    }}>
+                      <img
+                        src={convertGoogleDriveUrl(questions[currentIndex].questionImageUrl)}
+                        alt="問題画像"
+                        style={{
+                          maxWidth: '100%',
+                          maxHeight: 200,
+                          borderRadius: 8,
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                        }}
+                        onError={(e) => {
+                          console.log('画像読み込みエラー:', questions[currentIndex].questionImageUrl);
+                          console.log('変換後URL:', convertGoogleDriveUrl(questions[currentIndex].questionImageUrl));
+                          e.target.style.display = 'none';
+                        }}
+                        onLoad={() => {
+                          console.log('画像読み込み成功:', convertGoogleDriveUrl(questions[currentIndex].questionImageUrl));
+                        }}
+                      />
+                    </div>
+                  )}
+
                   {/* 問題出題時のヒント・わからないボタン */}
                   {msg.sender === 'sensei' && 
                    !msg.showButtons && 
@@ -1526,9 +1762,11 @@ function App() {
                               // 全ての問題が終了
                               // 最後の問題の間違えた記録が反映されるように、少し待ってから判定
                               setTimeout(() => {
+                                console.log('問題終了時の判定 - wrongQuestions.length:', wrongQuestions.length, 'isReviewMode:', isReviewMode);
                                 if (wrongQuestions.length > 0 && !isReviewMode) {
                                   // 間違えた問題がある場合は復習モードを開始
-                                  startReviewMode(wrongQuestions);
+                                  console.log('復習モード開始');
+                                  startReviewMode();
                                 } else if (wrongQuestions.length === 0 && isReviewMode) {
                                   // 復習モードで全問正解
                                   console.log('復習モード → 全問正解');
@@ -1541,7 +1779,8 @@ function App() {
                                 } else if (wrongQuestions.length > 0 && isReviewMode) {
                                   // 復習モードで間違えた問題がある場合は次の復習ラウンドを開始
                                   console.log('復習モード → 次の復習ラウンド開始');
-                                  startReviewMode(wrongQuestions); // 間違えた問題リストを直接渡す
+                                  console.log('次の復習ラウンド対象問題:', wrongQuestions);
+                                  startReviewMode(); // 間違えた問題リストのコピーを渡す
                                 } else {
                                   // 通常の終了
                                   console.log('通常の終了');
@@ -1572,8 +1811,8 @@ function App() {
                     <div style={{
                       marginTop: 12,
                       display: 'flex',
-                      flexDirection: 'column',
-                      gap: 8,
+                      flexWrap: 'wrap',
+                      gap: 6,
                     }}>
                       {getChoices(questions[currentIndex]).map((choice, index) => (
                         <button
@@ -1582,15 +1821,17 @@ function App() {
                             background: '#4FC3F7',
                             color: '#01579b',
                             border: 'none',
-                            borderRadius: 8,
-                            padding: '12px 16px',
-                            fontSize: 16,
+                            borderRadius: 6,
+                            padding: '6px 10px',
+                            fontSize: 12,
                             fontWeight: 'bold',
                             cursor: 'pointer',
-                            textAlign: 'left',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                            textAlign: 'center',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
                             transition: 'all 0.2s ease',
-                            width: '100%',
+                            minWidth: 'fit-content',
+                            maxWidth: 'calc(50% - 3px)',
+                            flex: '1 1 auto',
                           }}
                           onMouseOver={(e) => {
                             e.target.style.background = '#29B6F6';
@@ -1605,90 +1846,6 @@ function App() {
                           {choice}
                         </button>
                       ))}
-                      
-                      {/* わからないボタン - 選択肢問題でも表示 */}
-                      <button
-                        style={{
-                          background: '#9E9E9E',
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: 8,
-                          padding: '8px 12px',
-                          fontSize: 14,
-                          fontWeight: 'bold',
-                          cursor: 'pointer',
-                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                          transition: 'all 0.2s ease',
-                          width: '100%',
-                          marginTop: 8,
-                        }}
-                        onMouseOver={(e) => {
-                          e.target.style.background = '#757575';
-                          e.target.style.transform = 'translateY(-1px)';
-                        }}
-                        onMouseOut={(e) => {
-                          e.target.style.background = '#9E9E9E';
-                          e.target.style.transform = 'translateY(0)';
-                        }}
-                        onClick={() => {
-                          const answer = questions[currentIndex].answer.trim();
-                          setChat(prev => [
-                            ...prev,
-                            { sender: 'sensei', text: `正解は「${answer}」でした。`, face: 'tai-normal' }
-                          ]);
-                          
-                          // 間違えた問題を記録
-                          recordWrongQuestion(questions[currentIndex]);
-                          
-                          // 回答記録を送信（不正解として記録）
-                          const currentQuestion = questions[currentIndex];
-                          let questionId;
-                          if (isRandomOrder && currentQuestion.originalIndex !== undefined) {
-                            questionId = originalQuestions[currentQuestion.originalIndex].id;
-                          } else {
-                            questionId = currentQuestion.id;
-                          }
-                          recordAnswer(questionId, false);
-                          
-                          setTimeout(() => {
-                            if (currentIndex + 1 < questions.length) {
-                              setCurrentIndex(prev => prev + 1);
-                            } else {
-                              // 全ての問題が終了
-                              // 最後の問題の間違えた記録が反映されるように、少し待ってから判定
-                              setTimeout(() => {
-                                if (wrongQuestions.length > 0 && !isReviewMode) {
-                                  // 間違えた問題がある場合は復習モードを開始
-                                  startReviewMode(wrongQuestions);
-                                } else if (wrongQuestions.length === 0 && isReviewMode) {
-                                  // 復習モードで全問正解
-                                  console.log('復習モード → 全問正解');
-                                  setChat(prev => [
-                                    ...prev,
-                                    { sender: 'sensei', text: 'おめでとうございます！全問正解です！', face: 'tai-good1' }
-                                  ]);
-                                  setWrongQuestions([]); // 全問正解時に間違えた問題リストをクリア
-                                  setIsFinished(true);
-                                } else if (wrongQuestions.length > 0 && isReviewMode) {
-                                  // 復習モードで間違えた問題がある場合は次の復習ラウンドを開始
-                                  console.log('復習モード → 次の復習ラウンド開始');
-                                  startReviewMode(wrongQuestions); // 間違えた問題リストを直接渡す
-                                } else {
-                                  // 通常の終了
-                                  console.log('通常の終了');
-                                  setChat(prev => [
-                                    ...prev,
-                                    { sender: 'sensei', text: '全ての問題が終了しました！お疲れさまでした。', face: 'tai-normal' }
-                                  ]);
-                                  setIsFinished(true);
-                                }
-                              }, 100); // 100ms待ってから判定
-                            }
-                          }, 1500); // 正解表示から1.5秒後に次の処理
-                        }}
-                      >
-                        わからない
-                      </button>
                     </div>
                   )}
                 </div>

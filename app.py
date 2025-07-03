@@ -48,6 +48,7 @@ def get_questions_from_sheet():
                 "level": row[7].strip() if len(row) > 7 else "",
                 "imageUrl": row[8].strip() if len(row) > 8 else "",
                 "hint": row[9].strip() if len(row) > 9 else "",
+                "questionImageUrl": row[10].strip() if len(row) > 10 else "",
                 # 選択肢データ（M列以降）
                 "choice1": row[12].strip() if len(row) > 12 else "",
                 "choice2": row[13].strip() if len(row) > 13 else "",
@@ -97,6 +98,41 @@ def vision_ocr():
         return jsonify({'text': texts[0].description.strip()})
     else:
         return jsonify({'text': ''})
+
+@app.route('/api/get_image/<file_id>')
+def get_image(file_id):
+    try:
+        # Google Driveの画像を直接取得して返す（Discordボットと同じ方法）
+        import requests
+        from io import BytesIO
+        
+        # Google Driveの直接ダウンロードURL
+        direct_url = f'https://drive.google.com/uc?export=download&id={file_id}'
+        
+        # 画像を取得
+        response = requests.get(direct_url, timeout=10)
+        if response.status_code == 200:
+            # Content-Typeを確認して適切なMIMEタイプを設定
+            ctype = response.headers.get("Content-Type", "")
+            if 'gif' in ctype:
+                mimetype = 'image/gif'
+            elif 'png' in ctype:
+                mimetype = 'image/png'
+            elif 'jpeg' in ctype or 'jpg' in ctype:
+                mimetype = 'image/jpeg'
+            else:
+                mimetype = 'image/jpeg'  # デフォルト
+            
+            # 画像データをそのまま返す
+            from flask import Response
+            return Response(response.content, mimetype=mimetype)
+        else:
+            print(f"Failed to fetch image: {response.status_code}")
+            return jsonify({"error": "Failed to fetch image"}), 404
+            
+    except Exception as e:
+        print(f"Image fetch error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/record_answer', methods=['POST'])
 def record_answer():
