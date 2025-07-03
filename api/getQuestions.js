@@ -18,7 +18,7 @@ async function getQuestions() {
   const sheets = google.sheets({ version: 'v4', auth: await auth.getClient() });
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,
-    range: `${SHEET_NAME}!A2:J`,
+    range: `${SHEET_NAME}!A2:S`,
   });
   const questions = res.data.values.map(row => ({
     id: row[0],
@@ -31,6 +31,13 @@ async function getQuestions() {
     level: row[7],
     imageUrl: row[8],
     hint: row[9] || '',
+    choice1: row[12] || '',
+    choice2: row[13] || '',
+    choice3: row[14] || '',
+    choice4: row[15] || '',
+    choice5: row[16] || '',
+    choice6: row[17] || '',
+    choice7: row[18] || '',
   }));
   return questions;
 }

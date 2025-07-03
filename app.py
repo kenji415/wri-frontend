@@ -47,7 +47,15 @@ def get_questions_from_sheet():
                 "type": row[6].strip() if len(row) > 6 else "",
                 "level": row[7].strip() if len(row) > 7 else "",
                 "imageUrl": row[8].strip() if len(row) > 8 else "",
-                "hint": row[9].strip() if len(row) > 9 else ""
+                "hint": row[9].strip() if len(row) > 9 else "",
+                # 選択肢データ（M列以降）
+                "choice1": row[12].strip() if len(row) > 12 else "",
+                "choice2": row[13].strip() if len(row) > 13 else "",
+                "choice3": row[14].strip() if len(row) > 14 else "",
+                "choice4": row[15].strip() if len(row) > 15 else "",
+                "choice5": row[16].strip() if len(row) > 16 else "",
+                "choice6": row[17].strip() if len(row) > 17 else "",
+                "choice7": row[18].strip() if len(row) > 18 else ""
             })
     return questions
 

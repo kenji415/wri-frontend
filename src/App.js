@@ -749,6 +749,101 @@ function App() {
     setInputText(prev => prev.slice(0, -1));
   };
 
+  // 選択肢ボタンをクリックした時の処理
+  const handleChoiceClick = (selectedChoice) => {
+    if (isFinished) return;
+    
+    const currentQuestion = questions[currentIndex];
+    const answer = currentQuestion.answer.trim();
+    const isCorrect = selectedChoice === answer;
+    
+    let face = 'tai-normal';
+    if (isCorrect) {
+      const goodNum = Math.floor(Math.random() * 5) + 1;
+      face = `tai-good${goodNum}`;
+    } else {
+      const badNum = Math.floor(Math.random() * 4) + 1;
+      face = `tai-bad${badNum}`;
+    }
+    
+    setChat(prev => [
+      ...prev,
+      { sender: 'seito', text: selectedChoice },
+      { sender: 'sensei', text: isCorrect ? '正解！' : `不正解… 正解は「${answer}」`, face }
+    ]);
+    setEffect(isCorrect ? 'correct' : 'wrong');
+    setTimeout(() => setEffect('none'), 500);
+    
+    // 間違えた問題を記録
+    if (!isCorrect) {
+      recordWrongQuestion(currentQuestion);
+    }
+    
+    // 回答記録を送信
+    let questionId;
+    if (isRandomOrder && currentQuestion.originalIndex !== undefined) {
+      questionId = originalQuestions[currentQuestion.originalIndex].id;
+    } else {
+      questionId = currentQuestion.id;
+    }
+    recordAnswer(questionId, isCorrect);
+    
+    // 正解表示後に少し待ってから次の問題へ
+    setTimeout(() => {
+      if (currentIndex + 1 < questions.length) {
+        // 次の問題を表示
+        setCurrentIndex(prev => prev + 1);
+      } else {
+        // 全ての問題が終了
+        // 最後の問題の間違えた記録が反映されるように、少し待ってから判定
+        setTimeout(() => {
+          if (wrongQuestions.length > 0 && !isReviewMode) {
+            // 間違えた問題がある場合は復習モードを開始
+            startReviewMode(wrongQuestions);
+          } else if (wrongQuestions.length === 0 && isReviewMode) {
+            // 復習モードで全問正解
+            console.log('復習モード → 全問正解');
+            setChat(prev => [
+              ...prev,
+              { sender: 'sensei', text: 'おめでとうございます！全問正解です！', face: 'tai-good1' }
+            ]);
+            setWrongQuestions([]); // 全問正解時に間違えた問題リストをクリア
+            setIsFinished(true);
+          } else if (wrongQuestions.length > 0 && isReviewMode) {
+            // 復習モードで間違えた問題がある場合は次の復習ラウンドを開始
+            console.log('復習モード → 次の復習ラウンド開始');
+            startReviewMode(wrongQuestions); // 間違えた問題リストを直接渡す
+          } else {
+            // 通常の終了
+            console.log('通常の終了');
+            setChat(prev => [
+              ...prev,
+              { sender: 'sensei', text: '全ての問題が終了しました！お疲れさまでした。', face: 'tai-normal' }
+            ]);
+            setIsFinished(true);
+          }
+        }, 100); // 100ms待ってから判定
+      }
+    }, 1500); // 正解表示から1.5秒後に次の処理
+  };
+
+  // 選択肢を取得する関数
+  const getChoices = (question) => {
+    const choices = [];
+    for (let i = 1; i <= 7; i++) {
+      const choice = question[`choice${i}`];
+      if (choice && choice.trim()) {
+        choices.push(choice.trim());
+      }
+    }
+    return choices;
+  };
+
+  // 現在の問題が選択肢問題かどうかを判定
+  const isChoiceQuestion = (question) => {
+    return question && question.type === '選択肢';
+  };
+
   // スタイル定義
   const styles = {
     container: {
@@ -1465,14 +1560,146 @@ function App() {
                       </button>
                     </div>
                   )}
+
+                  {/* 選択肢問題の選択肢ボタン */}
+                  {msg.sender === 'sensei' && 
+                   !msg.showButtons && 
+                   !msg.showLevelButtons && 
+                   questions[currentIndex] && 
+                   !isFinished && 
+                   msg.text === questions[currentIndex].question &&
+                   isChoiceQuestion(questions[currentIndex]) && (
+                    <div style={{
+                      marginTop: 12,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 8,
+                    }}>
+                      {getChoices(questions[currentIndex]).map((choice, index) => (
+                        <button
+                          key={index}
+                          style={{
+                            background: '#4FC3F7',
+                            color: '#01579b',
+                            border: 'none',
+                            borderRadius: 8,
+                            padding: '12px 16px',
+                            fontSize: 16,
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                            transition: 'all 0.2s ease',
+                            width: '100%',
+                          }}
+                          onMouseOver={(e) => {
+                            e.target.style.background = '#29B6F6';
+                            e.target.style.transform = 'translateY(-1px)';
+                          }}
+                          onMouseOut={(e) => {
+                            e.target.style.background = '#4FC3F7';
+                            e.target.style.transform = 'translateY(0)';
+                          }}
+                          onClick={() => handleChoiceClick(choice)}
+                        >
+                          {choice}
+                        </button>
+                      ))}
+                      
+                      {/* わからないボタン - 選択肢問題でも表示 */}
+                      <button
+                        style={{
+                          background: '#9E9E9E',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: 8,
+                          padding: '8px 12px',
+                          fontSize: 14,
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                          transition: 'all 0.2s ease',
+                          width: '100%',
+                          marginTop: 8,
+                        }}
+                        onMouseOver={(e) => {
+                          e.target.style.background = '#757575';
+                          e.target.style.transform = 'translateY(-1px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.target.style.background = '#9E9E9E';
+                          e.target.style.transform = 'translateY(0)';
+                        }}
+                        onClick={() => {
+                          const answer = questions[currentIndex].answer.trim();
+                          setChat(prev => [
+                            ...prev,
+                            { sender: 'sensei', text: `正解は「${answer}」でした。`, face: 'tai-normal' }
+                          ]);
+                          
+                          // 間違えた問題を記録
+                          recordWrongQuestion(questions[currentIndex]);
+                          
+                          // 回答記録を送信（不正解として記録）
+                          const currentQuestion = questions[currentIndex];
+                          let questionId;
+                          if (isRandomOrder && currentQuestion.originalIndex !== undefined) {
+                            questionId = originalQuestions[currentQuestion.originalIndex].id;
+                          } else {
+                            questionId = currentQuestion.id;
+                          }
+                          recordAnswer(questionId, false);
+                          
+                          setTimeout(() => {
+                            if (currentIndex + 1 < questions.length) {
+                              setCurrentIndex(prev => prev + 1);
+                            } else {
+                              // 全ての問題が終了
+                              // 最後の問題の間違えた記録が反映されるように、少し待ってから判定
+                              setTimeout(() => {
+                                if (wrongQuestions.length > 0 && !isReviewMode) {
+                                  // 間違えた問題がある場合は復習モードを開始
+                                  startReviewMode(wrongQuestions);
+                                } else if (wrongQuestions.length === 0 && isReviewMode) {
+                                  // 復習モードで全問正解
+                                  console.log('復習モード → 全問正解');
+                                  setChat(prev => [
+                                    ...prev,
+                                    { sender: 'sensei', text: 'おめでとうございます！全問正解です！', face: 'tai-good1' }
+                                  ]);
+                                  setWrongQuestions([]); // 全問正解時に間違えた問題リストをクリア
+                                  setIsFinished(true);
+                                } else if (wrongQuestions.length > 0 && isReviewMode) {
+                                  // 復習モードで間違えた問題がある場合は次の復習ラウンドを開始
+                                  console.log('復習モード → 次の復習ラウンド開始');
+                                  startReviewMode(wrongQuestions); // 間違えた問題リストを直接渡す
+                                } else {
+                                  // 通常の終了
+                                  console.log('通常の終了');
+                                  setChat(prev => [
+                                    ...prev,
+                                    { sender: 'sensei', text: '全ての問題が終了しました！お疲れさまでした。', face: 'tai-normal' }
+                                  ]);
+                                  setIsFinished(true);
+                                }
+                              }, 100); // 100ms待ってから判定
+                            }
+                          }, 1500); // 正解表示から1.5秒後に次の処理
+                        }}
+                      >
+                        わからない
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
               <div ref={chatEndRef} />
           </div>
 
-          {/* 入力エリア - カテゴリ選択中は非表示 */}
-          {!showCategoryButtons && !showLevelButtons && !showQuestionCountButtons && (
+          {/* 入力エリア - カテゴリ選択中は非表示、選択肢問題の場合も非表示 */}
+          {!showCategoryButtons && !showLevelButtons && !showQuestionCountButtons && 
+           !(questions[currentIndex] && isChoiceQuestion(questions[currentIndex])) && (
             <>
               <div style={styles.headerRow}>
                 <input
