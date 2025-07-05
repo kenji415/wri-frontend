@@ -626,11 +626,50 @@ function App() {
     }, 600);
   };
 
+  // 解答判定関数（複数形式対応）
+  const checkAnswer = (userAnswer, correctAnswer) => {
+    // 前後の空白を除去
+    const cleanUserAnswer = userAnswer.trim();
+    const cleanCorrectAnswer = correctAnswer.trim();
+    
+    // 完全一致の場合は正解
+    if (cleanUserAnswer === cleanCorrectAnswer) {
+      return true;
+    }
+    
+    // 解答を分割して比較
+    const normalizeAnswer = (answer) => {
+      // 様々な区切り文字で分割（、,、,、スペース、全角スペース）
+      return answer
+        .split(/[、,，\s　]+/)
+        .map(item => item.trim())
+        .filter(item => item.length > 0)
+        .sort(); // 順序を無視するためソート
+    };
+    
+    const userAnswers = normalizeAnswer(cleanUserAnswer);
+    const correctAnswers = normalizeAnswer(cleanCorrectAnswer);
+    
+    // 配列の長さが異なる場合は不正解
+    if (userAnswers.length !== correctAnswers.length) {
+      return false;
+    }
+    
+    // ソート済みの配列を比較
+    for (let i = 0; i < userAnswers.length; i++) {
+      if (userAnswers[i] !== correctAnswers[i]) {
+        return false;
+      }
+    }
+    
+    return true;
+  };
+
   // 回答送信
   const handleSend = () => {
     if (!inputText || isFinished) return;
     const answer = questions[currentIndex].answer.trim();
-    const isCorrect = inputText.trim() === answer;
+    const isCorrect = checkAnswer(inputText, answer);
     let face = 'tai-normal';
     if (isCorrect) {
       const goodNum = Math.floor(Math.random() * 5) + 1;
@@ -783,7 +822,7 @@ function App() {
     
     const currentQuestion = questions[currentIndex];
     const answer = currentQuestion.answer.trim();
-    const isCorrect = selectedChoice === answer;
+    const isCorrect = checkAnswer(selectedChoice, answer);
     
     let face = 'tai-normal';
     if (isCorrect) {
