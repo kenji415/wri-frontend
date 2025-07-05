@@ -2,6 +2,35 @@ import React, { useRef, useState, useEffect } from 'react';
 import Tesseract from 'tesseract.js';
 import './App.css';
 
+// 回答の正規化と比較を行う関数
+const normalizeAndCompareAnswers = (userAnswer, correctAnswer) => {
+  // 正規化関数：様々な区切り文字で分割し、順序独立にする
+  const normalizeAnswer = (answer) => {
+    if (!answer || typeof answer !== 'string') return [];
+    
+    // 様々な区切り文字で分割（、,　スペース）
+    const parts = answer
+      .trim()
+      .split(/[、,　\s]+/) // 日本語コンマ、カンマ、全角スペース、半角スペース
+      .map(part => part.trim()) // 各部分の前後の空白を削除
+      .filter(part => part.length > 0) // 空文字を除去
+      .sort(); // アルファベット順に並び替えて順序独立にする
+    
+    return parts;
+  };
+  
+  const normalizedUser = normalizeAnswer(userAnswer);
+  const normalizedCorrect = normalizeAnswer(correctAnswer);
+  
+  // 配列の長さが異なる場合は不正解
+  if (normalizedUser.length !== normalizedCorrect.length) {
+    return false;
+  }
+  
+  // 正規化された配列を比較
+  return normalizedUser.every((part, index) => part === normalizedCorrect[index]);
+};
+
 function App() {
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -630,7 +659,7 @@ function App() {
   const handleSend = () => {
     if (!inputText || isFinished) return;
     const answer = questions[currentIndex].answer.trim();
-    const isCorrect = inputText.trim() === answer;
+    const isCorrect = normalizeAndCompareAnswers(inputText, answer);
     let face = 'tai-normal';
     if (isCorrect) {
       const goodNum = Math.floor(Math.random() * 5) + 1;
@@ -783,7 +812,7 @@ function App() {
     
     const currentQuestion = questions[currentIndex];
     const answer = currentQuestion.answer.trim();
-    const isCorrect = selectedChoice === answer;
+    const isCorrect = normalizeAndCompareAnswers(selectedChoice, answer);
     
     let face = 'tai-normal';
     if (isCorrect) {
