@@ -626,6 +626,24 @@ function App() {
     }, 600);
   };
 
+  // 音声再生関数
+  const playSound = (soundType) => {
+    try {
+      const audio = new Audio(`/sounds/${soundType}.mp3`);
+      audio.volume = 0.5; // 音量を50%に設定
+      audio.play().catch(error => {
+        console.log('音声再生エラー:', error);
+      });
+    } catch (error) {
+      console.log('音声ファイル読み込みエラー:', error);
+    }
+  };
+
+  // ボタンクリック音再生関数
+  const playButtonSound = () => {
+    playSound('push');
+  };
+
   // 解答判定関数（複数形式対応）
   const checkAnswer = (userAnswer, correctAnswer) => {
     // 前後の空白を除去
@@ -670,6 +688,10 @@ function App() {
     if (!inputText || isFinished) return;
     const answer = questions[currentIndex].answer.trim();
     const isCorrect = checkAnswer(inputText, answer);
+    
+    // 音声再生
+    playSound(isCorrect ? 'correct' : 'wrong');
+    
     let face = 'tai-normal';
     if (isCorrect) {
       const goodNum = Math.floor(Math.random() * 5) + 1;
@@ -726,9 +748,9 @@ function App() {
 
   // 復習モードを開始する関数
   const startReviewMode = () => {
-  setIsReviewMode(true);
-  setReviewRound(prev => prev + 1);
-};
+    setIsReviewMode(true);
+    setReviewRound(prev => prev + 1);
+  };
 
   // 復習モード開始時にquestionsをセット
   useEffect(() => {
@@ -823,6 +845,9 @@ function App() {
     const currentQuestion = questions[currentIndex];
     const answer = currentQuestion.answer.trim();
     const isCorrect = checkAnswer(selectedChoice, answer);
+    
+    // 音声再生
+    playSound(isCorrect ? 'correct' : 'wrong');
     
     let face = 'tai-normal';
     if (isCorrect) {
@@ -1108,6 +1133,40 @@ function App() {
     }
   }, [questions.length, wrongQuestions, isReviewMode]);
 
+  // ジャンル選択
+  const handleGenreSelect = (genre) => {
+    playButtonSound(); // ボタンクリック音
+    setSelectedGenre(genre);
+    setShowCategoryButtons(false);
+    setShowLevelButtons(true);
+  };
+
+  // レベル選択
+  const handleLevelSelect = (level) => {
+    playButtonSound(); // ボタンクリック音
+    setSelectedLevel(level);
+    setShowLevelButtons(false);
+    setShowQuestionCountButtons(true);
+  };
+
+  // 戻るボタン
+  const handleBack = () => {
+    playButtonSound(); // ボタンクリック音
+    if (showQuestionCountButtons) {
+      setShowQuestionCountButtons(false);
+      setShowLevelButtons(true);
+      setSelectedQuestionCount(null);
+    } else if (showLevelButtons) {
+      setShowLevelButtons(false);
+      setShowCategoryButtons(true);
+      setSelectedLevel(null);
+    } else if (showCategoryButtons) {
+      setShowCategoryButtons(false);
+      setShowTop(true);
+      setSelectedGenre(null);
+    }
+  };
+
   if (showTop) {
     return (
       <>
@@ -1163,7 +1222,7 @@ function App() {
                   minWidth: 80,
                   whiteSpace: 'nowrap',
                 }}
-                onClick={() => { setSelectedGenre('地理'); setShowTop(false); }}
+                onClick={() => { handleGenreSelect('地理'); setShowTop(false); }}
               >
                 地理
               </button>
@@ -1181,7 +1240,7 @@ function App() {
                   minWidth: 80,
                   whiteSpace: 'nowrap',
                 }}
-                onClick={() => { setSelectedGenre('歴史'); setShowTop(false); }}
+                onClick={() => { handleGenreSelect('歴史'); setShowTop(false); }}
               >
                 歴史
               </button>
@@ -1199,7 +1258,7 @@ function App() {
                   minWidth: 80,
                   whiteSpace: 'nowrap',
                 }}
-                onClick={() => { setSelectedGenre('公民'); setShowTop(false); }}
+                onClick={() => { handleGenreSelect('公民'); setShowTop(false); }}
               >
                 公民
               </button>
@@ -1422,7 +1481,7 @@ function App() {
                                   e.target.style.background = '#90CAF9';
                                   e.target.style.transform = 'translateY(0)';
                                 }}
-                                onClick={() => setSelectedLevel('レベル1')}
+                                onClick={() => handleLevelSelect('レベル1')}
                               >
                                 基礎
                               </button>
@@ -1449,7 +1508,7 @@ function App() {
                                   e.target.style.background = '#90CAF9';
                                   e.target.style.transform = 'translateY(0)';
                                 }}
-                                onClick={() => setSelectedLevel('レベル2')}
+                                onClick={() => handleLevelSelect('レベル2')}
                               >
                                 標準
                               </button>
@@ -1476,7 +1535,7 @@ function App() {
                                   e.target.style.background = '#90CAF9';
                                   e.target.style.transform = 'translateY(0)';
                                 }}
-                                onClick={() => setSelectedLevel('レベル3')}
+                                onClick={() => handleLevelSelect('レベル3')}
                               >
                                 応用
                               </button>
@@ -1520,7 +1579,7 @@ function App() {
                             e.target.style.background = '#4FC3F7';
                             e.target.style.transform = 'translateY(0)';
                           }}
-                          onClick={() => setSelectedLevel(level)}
+                          onClick={() => handleLevelSelect(level)}
                         >
                           {level}
                         </button>
@@ -1586,6 +1645,7 @@ function App() {
                           }}
                           onClick={() => {
                             if (customQuestionCount && parseInt(customQuestionCount) > 0 && parseInt(customQuestionCount) <= availableQuestionCount) {
+                              playButtonSound(); // ボタンクリック音
                               setSelectedQuestionCount(parseInt(customQuestionCount).toString());
                             }
                           }}
@@ -1625,6 +1685,7 @@ function App() {
                             }}
                             onClick={() => {
                               console.log('問題数選択ボタンクリック:', count);
+                              playButtonSound(); // ボタンクリック音
                               setSelectedQuestionCount(count);
                             }}
                           >
