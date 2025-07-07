@@ -62,7 +62,6 @@ function App() {
   // 復習モード用state
   const [wrongQuestions, setWrongQuestions] = useState([]);
   const [isReviewMode, setIsReviewMode] = useState(false);
-  const [reviewRound, setReviewRound] = useState(1);
 
   // ユーザー管理用state
   const [userId, setUserId] = useState('');
@@ -749,39 +748,27 @@ function App() {
   // 復習モードを開始する関数
   const startReviewMode = () => {
     setIsReviewMode(true);
-    setReviewRound(prev => prev + 1);
   };
 
-  // 復習モード開始時にquestionsをセット
+  // 復習モード開始時の処理（年号アプリのシンプルな実装を参考）
   useEffect(() => {
     if (isReviewMode && questions.length === 0 && wrongQuestions.length > 0) {
-      console.log('🔄 復習モード問題表示useEffect発火:', {
-        isReviewMode,
-        questionsLength: questions.length,
-        currentIndex,
-        questions: questions
+      console.log('🔄 復習モード開始:', {
+        wrongQuestionsLength: wrongQuestions.length
       });
       
-      // 復習モードの条件をチェック
-      if (isReviewMode && questions.length === 0 && wrongQuestions.length > 0) {
-        console.log('✅ 復習モード - 問題表示:', currentIndex);
-        console.log('表示する問題:', wrongQuestions[currentIndex]);
-        
-        setQuestions([...wrongQuestions]);
-        setCurrentIndex(0);
-        setChat(prev => [
-          ...prev,
-          { sender: 'sensei', text: `復習${reviewRound + 1}回目です！間違えた問題をもう一度解いてみましょう。`, face: 'tai-normal' }
-        ]);
-      } else {
-        console.log('❌ 復習モード問題表示条件不成立:', {
-          isReviewMode,
-          questionsLength: questions.length,
-          currentIndex
-        });
-      }
+      // 間違えた問題をquestionsにセット
+      setQuestions([...wrongQuestions]);
+      setCurrentIndex(0);
+      setWrongQuestions([]); // 間違えた問題リストをクリア
+      
+      // 復習メッセージを表示（1回だけ）
+      setChat(prev => [
+        ...prev,
+        { sender: 'sensei', text: '間違ってたとこ、もっかいいこ～！', face: 'tai-normal' }
+      ]);
     }
-  }, [isReviewMode, wrongQuestions, reviewRound]);
+  }, [isReviewMode, questions.length, wrongQuestions.length]);
 
   // 次の問題へ
   const nextQuestion = () => {
@@ -871,20 +858,25 @@ function App() {
       recordWrongQuestion(currentQuestion);
     }
     
-    // 復習モードで正解した場合は、間違えた問題リストから削除
-    console.log('復習モード正解処理 - isCorrect:', isCorrect, 'isReviewMode:', isReviewMode, 'currentQuestion.id:', currentQuestion.id);
+    // 復習モードで正解した場合は、questionsから削除（年号アプリのシンプルな実装）
     if (isCorrect && isReviewMode) {
       console.log('復習モード - 正解した問題を削除:', currentQuestion.id);
-      setWrongQuestions(prev => {
-        console.log('削除前の間違えた問題リスト:', prev);
-        const newList = prev.filter(q => q.id !== currentQuestion.id);
-        console.log('削除後の間違えた問題リスト:', newList);
-        return newList;
+      setQuestions(prev => {
+        const newQuestions = prev.filter(q => q.id !== currentQuestion.id);
+        console.log('削除後のquestions:', newQuestions);
+        return newQuestions;
       });
+      // 復習モードで問題を削除した場合、currentIndexを調整
+      if (currentIndex >= questions.length - 1) {
+        setCurrentIndex(0);
+      }
     } else if (isCorrect) {
-      console.log('通常モードで正解 - 削除処理なし');
-    } else {
-      console.log('不正解 - 削除処理なし');
+      // 通常モードで正解した場合も、復習モードで再度出題されるようにwrongQuestionsから削除
+      setWrongQuestions(prev => {
+        const newWrongQuestions = prev.filter(q => q.id !== currentQuestion.id);
+        console.log('通常モード正解 - wrongQuestionsから削除:', newWrongQuestions);
+        return newWrongQuestions;
+      });
     }
     
     // 回答記録を送信
@@ -1103,35 +1095,28 @@ function App() {
       startReviewMode();
       return;
     }
-    // 復習モードのラウンド遷移
+    
+    // 復習モードのラウンド遷移（年号アプリのシンプルな実装）
     if (isReviewMode && questions.length === 0) {
+      console.log('復習モード - questionsが空になった');
+      
       if (wrongQuestions.length === 0) {
+        console.log('復習モード終了 - 全問正解');
         setChat(prev => [
           ...prev,
-          { sender: 'sensei', text: 'おめでとうございます！全問正解です！', face: 'tai-good1' }
+          { sender: 'sensei', text: 'よーがんばったね！これで完璧', face: 'tai-good1' }
         ]);
         setIsFinished(true);
+        setIsReviewMode(false);
       } else {
-        // questionsを一度空にしてから復習ラウンドを開始
-        setQuestions([]);
-        // 最新のwrongQuestionsを確実に取得するため、少し遅延させる
-        setTimeout(() => {
-          console.log('復習ラウンド継続(setTimeout) - 最新のwrongQuestions:', wrongQuestions);
-          // wrongQuestionsの長さを再チェックして、0でない場合のみ継続
-          if (wrongQuestions.length > 0) {
-            startReviewMode();
-          } else {
-            // 全問正解の場合
-            setChat(prev => [
-              ...prev,
-              { sender: 'sensei', text: 'おめでとうございます！全問正解です！', face: 'tai-good1' }
-            ]);
-            setIsFinished(true);
-          }
-        }, 200);
+        console.log('復習モード継続 - まだ間違えた問題がある');
+        // 間違えた問題をquestionsにセットして復習継続
+        setQuestions([...wrongQuestions]);
+        setCurrentIndex(0);
+        setWrongQuestions([]); // 間違えた問題リストをクリア
       }
     }
-  }, [questions.length, wrongQuestions, isReviewMode]);
+  }, [questions.length, wrongQuestions.length, isReviewMode]);
 
   // ジャンル選択
   const handleGenreSelect = (genre) => {
