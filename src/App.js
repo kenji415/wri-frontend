@@ -649,12 +649,20 @@ function App() {
     const cleanUserAnswer = userAnswer.trim();
     const cleanCorrectAnswer = correctAnswer.trim();
     
-    // 完全一致の場合は正解
-    if (cleanUserAnswer === cleanCorrectAnswer) {
-      return true;
+    // 正解例を/で分割して配列に変換
+    const correctAnswers = cleanCorrectAnswer
+      .split('/')
+      .map(answer => answer.trim())
+      .filter(answer => answer.length > 0);
+    
+    // ユーザーの回答が正解例のいずれかと一致するかチェック
+    for (const correctAnswer of correctAnswers) {
+      if (cleanUserAnswer === correctAnswer) {
+        return true;
+      }
     }
     
-    // 解答を分割して比較
+    // 複数回答の場合（カンマ区切りなど）の処理
     const normalizeAnswer = (answer) => {
       // 様々な区切り文字で分割（、,、,、スペース、全角スペース）
       return answer
@@ -665,21 +673,31 @@ function App() {
     };
     
     const userAnswers = normalizeAnswer(cleanUserAnswer);
-    const correctAnswers = normalizeAnswer(cleanCorrectAnswer);
     
-    // 配列の長さが異なる場合は不正解
-    if (userAnswers.length !== correctAnswers.length) {
-      return false;
-    }
-    
-    // ソート済みの配列を比較
-    for (let i = 0; i < userAnswers.length; i++) {
-      if (userAnswers[i] !== correctAnswers[i]) {
-        return false;
+    // 各正解例に対して複数回答の比較を実行
+    for (const correctAnswer of correctAnswers) {
+      const correctAnswerArray = normalizeAnswer(correctAnswer);
+      
+      // 配列の長さが異なる場合はスキップ
+      if (userAnswers.length !== correctAnswerArray.length) {
+        continue;
+      }
+      
+      // ソート済みの配列を比較
+      let isMatch = true;
+      for (let i = 0; i < userAnswers.length; i++) {
+        if (userAnswers[i] !== correctAnswerArray[i]) {
+          isMatch = false;
+          break;
+        }
+      }
+      
+      if (isMatch) {
+        return true;
       }
     }
     
-    return true;
+    return false;
   };
 
   // 回答送信
@@ -699,10 +717,13 @@ function App() {
       const badNum = Math.floor(Math.random() * 4) + 1;
       face = `tai-bad${badNum}`;
     }
+    // 正解表示用のテキストを取得（複数正解例がある場合は最初のものを表示）
+    const displayAnswer = answer.split('/')[0].trim();
+    
     setChat(prev => [
       ...prev,
       { sender: 'seito', text: inputText },
-      { sender: 'sensei', text: isCorrect ? '正解！' : `不正解… 正解は「${answer}」`, face }
+      { sender: 'sensei', text: isCorrect ? '正解！' : `不正解… 正解は「${displayAnswer}」`, face }
     ]);
     setEffect(isCorrect ? 'correct' : 'wrong');
     setTimeout(() => setEffect('none'), 500);
@@ -845,10 +866,13 @@ function App() {
       face = `tai-bad${badNum}`;
     }
     
+    // 正解表示用のテキストを取得（複数正解例がある場合は最初のものを表示）
+    const displayAnswer = answer.split('/')[0].trim();
+    
     setChat(prev => [
       ...prev,
       { sender: 'seito', text: selectedChoice },
-      { sender: 'sensei', text: isCorrect ? '正解！' : `不正解… 正解は「${answer}」`, face }
+      { sender: 'sensei', text: isCorrect ? '正解！' : `不正解… 正解は「${displayAnswer}」`, face }
     ]);
     setEffect(isCorrect ? 'correct' : 'wrong');
     setTimeout(() => setEffect('none'), 500);
@@ -1108,6 +1132,9 @@ function App() {
         ]);
         setIsFinished(true);
         setIsReviewMode(false);
+        // 復習モード終了後は問題をクリアして終了状態を維持（年号アプリの実装を参考）
+        setQuestions([]);
+        setCurrentIndex(0);
       } else {
         console.log('復習モード継続 - まだ間違えた問題がある');
         // 間違えた問題をquestionsにセットして復習継続
@@ -1822,9 +1849,11 @@ function App() {
                         }}
                         onClick={() => {
                           const answer = questions[currentIndex].answer.trim();
+                          // 正解表示用のテキストを取得（複数正解例がある場合は最初のものを表示）
+                          const displayAnswer = answer.split('/')[0].trim();
                           setChat(prev => [
                             ...prev,
-                            { sender: 'sensei', text: `正解は「${answer}」でした。`, face: 'tai-normal' }
+                            { sender: 'sensei', text: `正解は「${displayAnswer}」でした。`, face: 'tai-normal' }
                           ]);
                           
                           // 間違えた問題を記録
