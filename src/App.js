@@ -64,6 +64,19 @@ function App() {
   const [customQuestionCount, setCustomQuestionCount] = useState('');
   const [isRandomOrder, setIsRandomOrder] = useState(false);
 
+  // おぼえるモード用state
+  const [isMemorizeMode, setIsMemorizeMode] = useState(false);
+  const [memorizePhase, setMemorizePhase] = useState('study'); // 'study' | 'test' | 'review'
+  const [memorizeTimer, setMemorizeTimer] = useState(null);
+  const [showAnswer, setShowAnswer] = useState(false);
+  const [memorizeProgress, setMemorizeProgress] = useState({
+    currentQuestionIndex: 0,
+    studyQuestions: [],
+    phase: 'study', // 'study' or 'review'
+    reviewStartIndex: 0,
+    totalQuestions: 0
+  });
+
   // 復習モード用state
   const [wrongQuestions, setWrongQuestions] = useState([]);
   const [isReviewMode, setIsReviewMode] = useState(false);
@@ -398,23 +411,70 @@ function App() {
       // selectedQuestionCountは保持する（リセットしない）
       console.log('最終問題数:', finalQuestions.length);
       
-      // 先生の質問を追加
-      setChat(prev => [
-        ...prev,
-        { 
-          sender: 'sensei', 
-          text: `ほなはじめるで～`, 
-          face: 'tai-normal' 
-        }
-      ]);
+      // おぼえるモードの場合の特別な処理
+      if (isMemorizeMode) {
+        setMemorizeProgress({
+          currentQuestionIndex: 0,
+          studyQuestions: finalQuestions,
+          phase: 'study', // 'study' or 'review'
+          reviewStartIndex: 0,
+          totalQuestions: finalQuestions.length
+        });
+        setMemorizePhase('study');
+        setShowAnswer(true);
+        
+        // おぼえるモード開始メッセージと最初の問題・解答を同時に表示
+        setChat(prev => [
+          ...prev,
+          { 
+            sender: 'sensei', 
+            text: `今から問題と解答を5秒間だけみせるから、おぼえてな。\n正解したらどんどん次の問題にいくで。\nただ、途中細かく復習も入れてくよ。\nすこしずつ覚えていこなー！`, 
+            face: 'tai-normal' 
+          },
+          { 
+            sender: 'sensei', 
+            text: finalQuestions[0].question, 
+            face: 'tai-normal',
+            isQuestion: true,
+            showMemorizeAnswer: true, // おぼえるモード用のフラグ
+            isMemorizeQuestionDisplay: true, // 問題表示フラグを追加
+            isNextQuestion: true // 次の問題フラグを追加
+          }
+        ]);
+        
+        // 5秒後に解答を非表示
+        setTimeout(() => {
+          setShowAnswer(false);
+          // チャット履歴を更新して解答表示フラグを削除
+          setChat(prev => prev.map(msg => 
+            msg.showMemorizeAnswer ? { ...msg, showMemorizeAnswer: false } : msg
+          ));
+        }, 5000);
+      } else {
+        // 通常モード
+        setChat(prev => [
+          ...prev,
+          { 
+            sender: 'sensei', 
+            text: `ほなはじめるで～`, 
+            face: 'tai-normal' 
+          }
+        ]);
+      }
     }
-  }, [selectedQuestionCount, selectedLevel, isRandomOrder]);
+  }, [selectedQuestionCount, selectedLevel, isRandomOrder, isMemorizeMode]);
 
   // 問題が切り替わったらチャット履歴をリセットし、先生の出題を追加
   useEffect(() => {
-    if (questions.length > 0 && !showCategoryButtons && !showLevelButtons && !showQuestionCountButtons && selectedLevel && selectedQuestionCount && currentIndex === 0 && !isReviewMode) {
+    if (questions.length > 0 && !showCategoryButtons && !showLevelButtons && !showQuestionCountButtons && selectedLevel && selectedQuestionCount && currentIndex === 0 && !isReviewMode && !isMemorizeMode) {
       // 1秒待ってから第一問を表示
       setTimeout(() => {
+        console.log('🔍 第一問表示デバッグ:', {
+          currentIndex,
+          question: questions[currentIndex],
+          questionsLength: questions.length
+        });
+        
         setChat(prev => [
           ...prev,
           { sender: 'sensei', text: questions[currentIndex].question, face: 'tai-normal', isQuestion: true }
@@ -431,7 +491,7 @@ function App() {
               }, 1000);
     }
     // eslint-disable-next-line
-  }, [currentIndex, questions.length, showCategoryButtons, showLevelButtons, showQuestionCountButtons, selectedDetailCategory, selectedLevel, selectedQuestionCount, isReviewMode]);
+  }, [currentIndex, questions.length, showCategoryButtons, showLevelButtons, showQuestionCountButtons, selectedDetailCategory, selectedLevel, selectedQuestionCount, isReviewMode, isMemorizeMode]);
 
   // 次の問題への移行
   useEffect(() => {
@@ -444,10 +504,18 @@ function App() {
     console.log('selectedQuestionCount:', selectedQuestionCount);
     console.log('currentIndex > 0:', currentIndex > 0);
     console.log('!isReviewMode:', !isReviewMode);
+    console.log('!isMemorizeMode:', !isMemorizeMode);
     
-    if (questions.length > 0 && !showCategoryButtons && !showLevelButtons && !showQuestionCountButtons && selectedLevel && selectedQuestionCount && currentIndex > 0 && !isReviewMode) {
+    if (questions.length > 0 && !showCategoryButtons && !showLevelButtons && !showQuestionCountButtons && selectedLevel && selectedQuestionCount && currentIndex > 0 && !isReviewMode && !isMemorizeMode) {
       console.log('次の問題表示処理開始 - currentIndex:', currentIndex);
       console.log('表示する問題:', questions[currentIndex]);
+      
+      // デバッグ用ログを追加
+      console.log('🔍 次の問題表示デバッグ:', {
+        currentIndex,
+        question: questions[currentIndex],
+        questionsLength: questions.length
+      });
       
       setChat(prev => [
         ...prev,
@@ -466,7 +534,7 @@ function App() {
       console.log('条件が満たされていません');
     }
     // eslint-disable-next-line
-  }, [currentIndex, questions.length, showCategoryButtons, showLevelButtons, showQuestionCountButtons, selectedDetailCategory, selectedLevel, selectedQuestionCount, isReviewMode]);
+  }, [currentIndex, questions.length, showCategoryButtons, showLevelButtons, showQuestionCountButtons, selectedDetailCategory, selectedLevel, selectedQuestionCount, isReviewMode, isMemorizeMode]);
 
   // 復習モードでの問題出題
   useEffect(() => {
@@ -502,6 +570,146 @@ function App() {
     }
     // eslint-disable-next-line
   }, [currentIndex, questions.length, isReviewMode]);
+
+  // おぼえるモードでの問題出題
+  useEffect(() => {
+    console.log('🧠 おぼえるモード問題表示useEffect発火:', {
+      isMemorizeMode,
+      memorizeProgress,
+      questionsLength: questions.length
+    });
+    
+    // おぼえるモードの回答処理で問題を表示した場合は、useEffectを発火させない
+    const lastMessage = chat[chat.length - 1];
+    const isMemorizeAnswerDisplayed = lastMessage && lastMessage.showMemorizeAnswer;
+    const isMemorizeQuestionDisplayed = lastMessage && lastMessage.isMemorizeQuestionDisplay;
+    const isRetryQuestion = lastMessage && lastMessage.isRetryQuestion;
+    const isNextQuestion = lastMessage && lastMessage.isNextQuestion;
+    const isTestQuestion = lastMessage && lastMessage.isTestQuestion;
+    
+    // デバッグ用ログを追加
+    console.log('🔍 おぼえるモード問題表示条件チェック:', {
+      isMemorizeAnswerDisplayed,
+      isMemorizeQuestionDisplayed,
+      isRetryQuestion,
+      isNextQuestion,
+      isTestQuestion
+    });
+    
+    if (isMemorizeMode && 
+        memorizeProgress.studyQuestions.length > 0 && 
+        !showCategoryButtons && 
+        !showLevelButtons && 
+        !showQuestionCountButtons && 
+        selectedLevel && 
+        selectedQuestionCount && 
+        !isMemorizeAnswerDisplayed && 
+        !isMemorizeQuestionDisplayed && 
+        !isRetryQuestion && 
+        !isNextQuestion && 
+        !isTestQuestion) {
+      
+      console.log('✅ おぼえるモード - 問題表示:', memorizeProgress.currentQuestionIndex);
+      
+      // おぼえるモードでは、memorizeProgressから正しい問題を取得
+      const { currentQuestionIndex, studyQuestions, phase } = memorizeProgress;
+      const memorizeQuestion = studyQuestions[currentQuestionIndex];
+      
+      console.log('表示する問題:', memorizeQuestion);
+      
+      // デバッグ用ログを追加
+      console.log('🔍 おぼえるモード問題表示デバッグ:', {
+        currentQuestionIndex,
+        memorizeQuestion,
+        studyQuestionsLength: studyQuestions.length,
+        phase
+      });
+      
+      // STUDYフェーズの場合は解答表示あり、REVIEWフェーズの場合は解答表示なし
+      if (phase === 'study') {
+        setShowAnswer(true);
+        setChat(prev => [
+          ...prev,
+          { 
+            sender: 'sensei', 
+            text: memorizeQuestion.question, 
+            face: 'tai-normal', 
+            isQuestion: true,
+            showMemorizeAnswer: true,
+            isMemorizeQuestionDisplay: true,
+            isNextQuestion: true
+          }
+        ]);
+        
+        // 5秒後に解答を非表示
+        setTimeout(() => {
+          setShowAnswer(false);
+          setChat(prev => prev.map(msg => 
+            msg.showMemorizeAnswer ? { ...msg, showMemorizeAnswer: false } : msg
+          ));
+        }, 5000);
+      } else if (phase === 'review') {
+        // REVIEWフェーズの場合は解答表示なし
+        // 再チェック開始時（currentQuestionIndex === reviewStartIndex）の場合はメッセージを追加
+        if (currentQuestionIndex === memorizeProgress.reviewStartIndex) {
+          setChat(prev => [
+            ...prev,
+            { 
+              sender: 'sensei', 
+              text: '3問前から再チェックするよ！', 
+              face: 'tai-normal'
+            },
+            { 
+              sender: 'sensei', 
+              text: memorizeQuestion.question, 
+              face: 'tai-normal', 
+              isQuestion: true,
+              isMemorizeQuestionDisplay: true,
+              isNextQuestion: true
+            }
+          ]);
+        } else {
+          setChat(prev => [
+            ...prev,
+            { 
+              sender: 'sensei', 
+              text: memorizeQuestion.question, 
+              face: 'tai-normal', 
+              isQuestion: true,
+              isMemorizeQuestionDisplay: true,
+              isNextQuestion: true
+            }
+          ]);
+        }
+      }
+      
+      clearCanvas();
+      setInputText('');
+      setRecognizedText('');
+      
+      // 次の問題の画像をプリロード
+      if (studyQuestions[currentQuestionIndex + 1] && studyQuestions[currentQuestionIndex + 1].questionImageUrl) {
+        const img = new Image();
+        img.src = convertGoogleDriveUrl(studyQuestions[currentQuestionIndex + 1].questionImageUrl);
+      }
+    } else {
+      console.log('❌ おぼえるモード問題表示条件不成立:', {
+        isMemorizeMode,
+        studyQuestionsLength: memorizeProgress.studyQuestions.length,
+        showCategoryButtons,
+        showLevelButtons,
+        showQuestionCountButtons,
+        selectedLevel,
+        selectedQuestionCount,
+        isMemorizeAnswerDisplayed,
+        isMemorizeQuestionDisplayed,
+        isRetryQuestion,
+        isNextQuestion,
+        isTestQuestion
+      });
+    }
+    // eslint-disable-next-line
+  }, [memorizeProgress.currentQuestionIndex, memorizeProgress.studyQuestions.length, memorizeProgress.phase, isMemorizeMode, showCategoryButtons, showLevelButtons, showQuestionCountButtons, selectedLevel, selectedQuestionCount]);
 
   // チャットが更新されたら自動で下までスクロール
   useEffect(() => {
@@ -813,8 +1021,31 @@ function App() {
   // 回答送信
   const handleSend = () => {
     if (!inputText || isFinished) return;
-    const currentQuestion = questions[currentIndex];
-    const answer = currentQuestion.answer.trim();
+    
+    // おぼえるモードでは、memorizeProgressから正しい問題を取得
+    let currentQuestion, answer;
+    if (isMemorizeMode) {
+      const { currentQuestionIndex, studyQuestions } = memorizeProgress;
+      currentQuestion = studyQuestions[currentQuestionIndex];
+      answer = currentQuestion.answer.trim();
+    } else {
+      currentQuestion = questions[currentIndex];
+      answer = currentQuestion.answer.trim();
+    }
+    
+    // デバッグ用ログを追加
+    console.log('🔍 回答送信デバッグ:', {
+      currentIndex,
+      inputText,
+      currentQuestion: {
+        id: currentQuestion.id,
+        question: currentQuestion.question,
+        answer: currentQuestion.answer
+      },
+      questionsLength: questions.length,
+      isMemorizeMode
+    });
+    
     const isCorrect = checkAnswer(inputText, answer, currentQuestion);
     
     // 音声再生
@@ -853,27 +1084,116 @@ function App() {
     }
     recordAnswer(questionId, isCorrect);
     
-    // 正解表示後に少し待ってから次の問題へ
-    setTimeout(() => {
-      console.log('次の問題への移行処理開始');
-      console.log('現在のインデックス:', currentIndex);
-      console.log('問題数:', questions.length);
-      console.log('次の問題があるか:', currentIndex + 1 < questions.length);
+    // おぼえるモードの場合の特別な処理
+    if (isMemorizeMode) {
+      // おぼえるモードでは、memorizeProgressから正しい問題を取得
+      const { currentQuestionIndex, studyQuestions } = memorizeProgress;
+      const memorizeQuestion = studyQuestions[currentQuestionIndex];
+      console.log('🧠 おぼえるモード選択肢回答デバッグ:', {
+        currentQuestionIndex,
+        memorizeQuestion,
+        currentQuestion
+      });
+      handleMemorizeModeAnswer(isCorrect, memorizeQuestion);
+    } else {
+      // 正解表示後に少し待ってから次の問題へ
+      setTimeout(() => {
+        console.log('次の問題への移行処理開始');
+        console.log('現在のインデックス:', currentIndex);
+        console.log('問題数:', questions.length);
+        console.log('次の問題があるか:', currentIndex + 1 < questions.length);
+        
+        if (currentIndex + 1 < questions.length) {
+          // 次の問題を表示
+          console.log('次の問題に移行します');
+          setCurrentIndex(prev => {
+            console.log('currentIndex更新:', prev, '→', prev + 1);
+            return prev + 1;
+          });
+        } else {
+          // 全ての問題が終了
+          console.log('全ての問題が終了しました');
+          setQuestions([]); // ここでquestionsを空にする
+          // setTimeoutでの復習ラウンド判定はuseEffectに一元化したのでここでは何もしない
+        }
+      }, 1500); // 正解表示から1.5秒後に次の処理
+    }
+    
+    // 入力フィールドをクリア
+    setInputText('');
+    setRecognizedText('');
+    clearCanvas(false);
+  };
+
+  // おぼえるモードの回答処理
+  const handleMemorizeModeAnswer = (isCorrect, currentQuestion) => {
+    setMemorizeProgress(prev => {
+      const nextIndex = prev.currentQuestionIndex + 1;
       
-      if (currentIndex + 1 < questions.length) {
-        // 次の問題を表示
-        console.log('次の問題に移行します');
-        setCurrentIndex(prev => {
-          console.log('currentIndex更新:', prev, '→', prev + 1);
-          return prev + 1;
-        });
-      } else {
-        // 全ての問題が終了
-        console.log('全ての問題が終了しました');
-        setQuestions([]); // ここでquestionsを空にする
-        // setTimeoutでの復習ラウンド判定はuseEffectに一元化したのでここでは何もしない
+      // REVIEWフェーズ
+      if (prev.phase === 'review') {
+        // 3問分進める
+        if (nextIndex < prev.reviewStartIndex + 3 && nextIndex < prev.studyQuestions.length) {
+          return {
+            ...prev,
+            currentQuestionIndex: nextIndex
+          };
+        } else {
+          // review終わったらstudyに戻す
+          const nextStudyIndex = prev.reviewStartIndex + 3;
+          
+          return {
+            ...prev,
+            phase: 'study',
+            currentQuestionIndex: nextStudyIndex
+          };
+        }
       }
-    }, 1500); // 正解表示から1.5秒後に次の処理
+      // STUDYフェーズ
+      if (prev.phase === 'study') {
+        // 3問ごとにreviewへ
+        if (nextIndex % 3 === 0 && nextIndex < prev.studyQuestions.length) {
+          const restartIndex = nextIndex - 3;
+          
+          return {
+            ...prev,
+            phase: 'review',
+            reviewStartIndex: restartIndex,
+            currentQuestionIndex: restartIndex
+          };
+        }
+        // 最後まで行ったらテストフェーズへ
+        if (nextIndex >= prev.studyQuestions.length) {
+          // テストフェーズ移行処理（必要なら追加）
+          return prev;
+        }
+        // 通常は次へ
+        return {
+          ...prev,
+          currentQuestionIndex: nextIndex
+        };
+      }
+      return prev;
+    });
+  };
+
+  // おぼえるモード完了処理
+  const handleMemorizeModeComplete = () => {
+    setChat(prev => [
+      ...prev,
+      { 
+        sender: 'sensei', 
+        text: '全チェックテスト！', 
+        face: 'tai-normal'
+      }
+    ]);
+    // ここで全問題の最終テストを開始
+    setMemorizePhase('review');
+    setMemorizeProgress(prev => ({
+      ...prev,
+      reviewQuestions: [...prev.studyQuestions],
+      currentQuestionIndex: 0
+    }));
   };
 
   // 復習モードを開始する関数
@@ -960,8 +1280,30 @@ function App() {
     
     if (isFinished) return;
     
-    const currentQuestion = questions[currentIndex];
-    const answer = currentQuestion.answer.trim();
+    // おぼえるモードでは、memorizeProgressから正しい問題を取得
+    let currentQuestion, answer;
+    if (isMemorizeMode) {
+      const { currentQuestionIndex, studyQuestions } = memorizeProgress;
+      currentQuestion = studyQuestions[currentQuestionIndex];
+      answer = currentQuestion.answer.trim();
+    } else {
+      currentQuestion = questions[currentIndex];
+      answer = currentQuestion.answer.trim();
+    }
+    
+    // デバッグ用ログを追加
+    console.log('🔍 選択肢回答デバッグ:', {
+      currentIndex,
+      selectedChoice,
+      currentQuestion: {
+        id: currentQuestion.id,
+        question: currentQuestion.question,
+        answer: currentQuestion.answer
+      },
+      questionsLength: questions.length,
+      isMemorizeMode
+    });
+    
     const isCorrect = checkAnswer(selectedChoice, answer, currentQuestion);
     
     // 音声再生
@@ -1043,6 +1385,11 @@ function App() {
         // setTimeoutでの復習ラウンド判定はuseEffectに一元化したのでここでは何もしない
       }
     }, 1500); // 正解表示から1.5秒後に次の処理
+    
+    // 入力フィールドをクリア
+    setInputText('');
+    setRecognizedText('');
+    clearCanvas(false);
   };
 
   // Google DriveのURLを直接画像URLに変換する関数
@@ -1964,6 +2311,41 @@ function App() {
                         );
                       })}
 
+                      {/* おぼえるモードチェックボックス */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        marginTop: 8,
+                        padding: '8px 12px',
+                        background: '#f5f5f5',
+                        borderRadius: 8,
+                        border: '1px solid #e0e0e0',
+                      }}>
+                        <input
+                          type="checkbox"
+                          id="memorizeMode"
+                          checked={isMemorizeMode}
+                          onChange={(e) => setIsMemorizeMode(e.target.checked)}
+                          style={{
+                            width: 16,
+                            height: 16,
+                            cursor: 'pointer',
+                          }}
+                        />
+                        <label
+                          htmlFor="memorizeMode"
+                          style={{
+                            fontSize: 14,
+                            color: '#333',
+                            cursor: 'pointer',
+                            userSelect: 'none',
+                          }}
+                        >
+                          おぼえるモード
+                        </label>
+                      </div>
+
                       {/* ランダム順序チェックボックス */}
                       <div style={{
                         display: 'flex',
@@ -2031,6 +2413,26 @@ function App() {
                           console.log('画像読み込み成功:', convertGoogleDriveUrl(questions[currentIndex].questionImageUrl));
                         }}
                       />
+                    </div>
+                  )}
+
+                  {/* おぼえるモードでの解答表示 */}
+                  {isMemorizeMode && showAnswer && msg.showMemorizeAnswer && (
+                    <div style={{
+                      marginTop: 8,
+                      padding: '12px',
+                      background: '#fff3cd',
+                      border: '1px solid #ffeaa7',
+                      borderRadius: 8,
+                      fontSize: 14,
+                      color: '#856404',
+                    }}>
+                      <strong>解答:</strong> {(() => {
+                        // 現在の問題に対応する解答を取得
+                        const currentQuestionText = msg.text;
+                        const currentQuestion = memorizeProgress.studyQuestions.find(q => q.question === currentQuestionText);
+                        return currentQuestion ? currentQuestion.answer : '';
+                      })()}
                     </div>
                   )}
 
