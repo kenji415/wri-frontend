@@ -643,11 +643,23 @@ function App() {
     playSound('push');
   };
 
-  // 解答判定関数（複数形式対応）
-  const checkAnswer = (userAnswer, correctAnswer) => {
+  // 解答判定関数（複数形式対応・順番判定対応）
+  const checkAnswer = (userAnswer, correctAnswer, currentQuestion = null) => {
     // 前後の空白を除去
     const cleanUserAnswer = userAnswer.trim();
     const cleanCorrectAnswer = correctAnswer.trim();
+    
+    // 順番判定が必要かどうかをチェック
+    const isOrderRequired = currentQuestion && currentQuestion.type && currentQuestion.type === '順番';
+    
+    // デバッグ用ログ
+    console.log('🔍 解答判定:', {
+      userAnswer: cleanUserAnswer,
+      correctAnswer: cleanCorrectAnswer,
+      isOrderRequired,
+      questionType: currentQuestion?.type,
+      questionId: currentQuestion?.id
+    });
     
     // 正解例を/で分割して配列に変換
     const correctAnswers = cleanCorrectAnswer
@@ -655,7 +667,7 @@ function App() {
       .map(answer => answer.trim())
       .filter(answer => answer.length > 0);
     
-    // ユーザーの回答が正解例のいずれかと一致するかチェック
+    // ユーザーの回答が正解例のいずれかと一致するかチェック（単一回答の場合）
     for (const correctAnswer of correctAnswers) {
       if (cleanUserAnswer === correctAnswer) {
         return true;
@@ -663,27 +675,29 @@ function App() {
     }
     
     // 複数回答の場合（カンマ区切りなど）の処理
-    const normalizeAnswer = (answer) => {
+    const normalizeAnswer = (answer, keepOrder = false) => {
       // 様々な区切り文字で分割（、,、,、スペース、全角スペース）
-      return answer
+      const items = answer
         .split(/[、,，\s　]+/)
         .map(item => item.trim())
-        .filter(item => item.length > 0)
-        .sort(); // 順序を無視するためソート
+        .filter(item => item.length > 0);
+      
+      // 順番が必要な場合はソートしない、そうでなければソート
+      return keepOrder ? items : items.sort();
     };
     
-    const userAnswers = normalizeAnswer(cleanUserAnswer);
+    const userAnswers = normalizeAnswer(cleanUserAnswer, isOrderRequired);
     
     // 各正解例に対して複数回答の比較を実行
     for (const correctAnswer of correctAnswers) {
-      const correctAnswerArray = normalizeAnswer(correctAnswer);
+      const correctAnswerArray = normalizeAnswer(correctAnswer, isOrderRequired);
       
       // 配列の長さが異なる場合はスキップ
       if (userAnswers.length !== correctAnswerArray.length) {
         continue;
       }
       
-      // ソート済みの配列を比較
+      // 順番を考慮した比較
       let isMatch = true;
       for (let i = 0; i < userAnswers.length; i++) {
         if (userAnswers[i] !== correctAnswerArray[i]) {
@@ -703,8 +717,9 @@ function App() {
   // 回答送信
   const handleSend = () => {
     if (!inputText || isFinished) return;
-    const answer = questions[currentIndex].answer.trim();
-    const isCorrect = checkAnswer(inputText, answer);
+    const currentQuestion = questions[currentIndex];
+    const answer = currentQuestion.answer.trim();
+    const isCorrect = checkAnswer(inputText, answer, currentQuestion);
     
     // 音声再生
     playSound(isCorrect ? 'correct' : 'wrong');
@@ -734,7 +749,6 @@ function App() {
     }
     
     // 回答記録を送信
-    const currentQuestion = questions[currentIndex];
     let questionId;
     if (isRandomOrder && currentQuestion.originalIndex !== undefined) {
       questionId = originalQuestions[currentQuestion.originalIndex].id;
@@ -852,7 +866,7 @@ function App() {
     
     const currentQuestion = questions[currentIndex];
     const answer = currentQuestion.answer.trim();
-    const isCorrect = checkAnswer(selectedChoice, answer);
+    const isCorrect = checkAnswer(selectedChoice, answer, currentQuestion);
     
     // 音声再生
     playSound(isCorrect ? 'correct' : 'wrong');
