@@ -47,6 +47,11 @@ function App() {
   const [selectedDetailCategory, setSelectedDetailCategory] = useState(null);
   const [showCategoryButtons, setShowCategoryButtons] = useState(false);
 
+  // 小分類選択用state
+  const [subCategories, setSubCategories] = useState([]);
+  const [selectedSubCategory, setSelectedSubCategory] = useState(null);
+  const [showSubCategoryButtons, setShowSubCategoryButtons] = useState(false);
+
   // レベル選択用state
   const [showLevelButtons, setShowLevelButtons] = useState(false);
   const [selectedLevel, setSelectedLevel] = useState(null);
@@ -220,7 +225,7 @@ function App() {
     }
   }, [selectedGenre, detailCategories.length, selectedDetailCategory]);
 
-  // 詳細カテゴリが選択されたら、レベル選択を表示
+  // 詳細カテゴリが選択されたら、小分類選択を表示
   useEffect(() => {
     if (selectedDetailCategory && originalQuestions.length > 0) {
       console.log('Filtering by detail category:', selectedDetailCategory);
@@ -231,14 +236,77 @@ function App() {
       console.log('Questions after detail category filtering:', filteredByDetail.length);
       console.log('Sample questions after detail filtering:', filteredByDetail.slice(0, 3));
       
-      setQuestions(filteredByDetail);
-      setExpandedCategory(selectedDetailCategory);
-      console.log('expandedCategory set to:', selectedDetailCategory);
+              // 小分類を抽出（重複を除去、空文字列は除外）
+        const uniqueSubCategories = [...new Set(filteredByDetail.map(q => q.subCategory).filter(sub => sub && sub.trim() !== ''))];
+        console.log('uniqueSubCategories:', uniqueSubCategories);
+        
+        // 問題データの詳細を確認
+        console.log('Sample questions with subCategory:', filteredByDetail.slice(0, 5).map(q => ({
+          id: q.id,
+          question: q.question,
+          detailCategory: q.detailCategory,
+          subCategory: q.subCategory,
+          level: q.level,
+          // 全てのフィールドを確認
+          allFields: Object.keys(q)
+        })));
+        
+        // 小分類の値を詳しく確認
+        console.log('SubCategory values:', filteredByDetail.map(q => ({
+          id: q.id,
+          subCategory: q.subCategory,
+          subCategoryType: typeof q.subCategory,
+          subCategoryLength: q.subCategory ? q.subCategory.length : 0
+        })));
+        
+        // 全てのフィールドの値を確認
+        console.log('All field values for first question:', Object.entries(filteredByDetail[0] || {}));
       
-      // チャットは追加しない（ボタンでレベル選択するため）
-      console.log('Category selected, waiting for level selection');
+      if (uniqueSubCategories.length > 1) {
+        // 小分類が複数ある場合は小分類選択を表示
+        setSubCategories(uniqueSubCategories);
+        setShowSubCategoryButtons(true);
+        setShowCategoryButtons(false);
+        console.log('Sub categories found, showing sub category selection');
+      } else if (uniqueSubCategories.length === 1) {
+        // 小分類が1つしかない場合は直接レベル選択へ
+        setQuestions(filteredByDetail);
+        setExpandedCategory(selectedDetailCategory);
+        console.log('expandedCategory set to:', selectedDetailCategory);
+        console.log('Single sub category, proceeding to level selection');
+      } else {
+        // 小分類が入力されていない場合は直接レベル選択へ
+        setQuestions(filteredByDetail);
+        setExpandedCategory(selectedDetailCategory);
+        console.log('expandedCategory set to:', selectedDetailCategory);
+        console.log('No sub categories, proceeding to level selection');
+      }
     }
   }, [selectedDetailCategory, originalQuestions.length, selectedGenre]);
+
+  // 小分類が選択されたら、レベル選択を表示
+  useEffect(() => {
+    if (selectedSubCategory && originalQuestions.length > 0) {
+      console.log('Filtering by sub category:', selectedSubCategory);
+      console.log('Original questions count:', originalQuestions.length);
+      
+      // 小分類でフィルタリング
+      const filteredBySub = originalQuestions.filter(q => 
+        q.detailCategory === selectedDetailCategory && 
+        q.subCategory === selectedSubCategory
+      );
+      console.log('Questions after sub category filtering:', filteredBySub.length);
+      console.log('Sample questions after sub filtering:', filteredBySub.slice(0, 3));
+      
+      setQuestions(filteredBySub);
+      setExpandedCategory(selectedSubCategory);
+      // setShowSubCategoryButtons(false); // この行を削除して、小分類ボタンを表示したままにする
+      console.log('expandedCategory set to:', selectedSubCategory);
+      console.log('Sub category selected, proceeding to level selection');
+      
+      // 新しいチャットメッセージは追加せず、既存のメッセージの下にレベルボタンを展開
+    }
+  }, [selectedSubCategory, originalQuestions.length, selectedDetailCategory, selectedGenre]);
 
   // レベルが選択されたら、そのレベルの問題のみをフィルタリング
   useEffect(() => {
@@ -445,6 +513,34 @@ function App() {
       });
     }
   }, [chat]);
+
+  // 小分類選択時に自動スクロール
+  useEffect(() => {
+    if (selectedSubCategory && chatEndRef.current) {
+      // 少し待ってからスクロール（UIの更新を待つ）
+      setTimeout(() => {
+        chatEndRef.current.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+          inline: 'nearest'
+        });
+      }, 100);
+    }
+  }, [selectedSubCategory]);
+
+  // レベル選択時に自動スクロール
+  useEffect(() => {
+    if (selectedLevel && chatEndRef.current) {
+      // 少し待ってからスクロール（UIの更新を待つ）
+      setTimeout(() => {
+        chatEndRef.current.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+          inline: 'nearest'
+        });
+      }, 100);
+    }
+  }, [selectedLevel]);
 
   // 座標取得関数
   const getPointerPos = (e) => {
@@ -1184,8 +1280,17 @@ function App() {
       setSelectedQuestionCount(null);
     } else if (showLevelButtons) {
       setShowLevelButtons(false);
+      if (showSubCategoryButtons) {
+        setShowSubCategoryButtons(true);
+        setSelectedLevel(null);
+      } else {
+        setShowCategoryButtons(true);
+        setSelectedLevel(null);
+      }
+    } else if (showSubCategoryButtons) {
+      setShowSubCategoryButtons(false);
       setShowCategoryButtons(true);
-      setSelectedLevel(null);
+      setSelectedSubCategory(null);
     } else if (showCategoryButtons) {
       setShowCategoryButtons(false);
       setShowTop(true);
@@ -1474,6 +1579,145 @@ function App() {
                           >
                             {category}
                           </button>
+                          
+                          {/* 小分類選択ボタン */}
+                          {showSubCategoryButtons && selectedDetailCategory === category && (
+                            <div style={{
+                              marginTop: 4,
+                              marginLeft: 16,
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 4,
+                            }}>
+                              {subCategories.map((subCategory, subIndex) => (
+                                <div key={subIndex}>
+                                  <button
+                                    style={{
+                                      background: '#90CAF9',
+                                      color: '#01579b',
+                                      border: 'none',
+                                      borderRadius: 6,
+                                      padding: '6px 10px',
+                                      fontSize: 12,
+                                      fontWeight: 'bold',
+                                      cursor: 'pointer',
+                                      textAlign: 'left',
+                                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                                      transition: 'all 0.2s ease',
+                                      width: '100%',
+                                    }}
+                                    onMouseOver={(e) => {
+                                      e.target.style.background = '#64B5F6';
+                                      e.target.style.transform = 'translateY(-1px)';
+                                    }}
+                                    onMouseOut={(e) => {
+                                      e.target.style.background = '#90CAF9';
+                                      e.target.style.transform = 'translateY(0)';
+                                    }}
+                                    onClick={() => {
+                                      console.log('Sub category clicked:', subCategory);
+                                      setSelectedSubCategory(subCategory);
+                                    }}
+                                  >
+                                    {subCategory}
+                                  </button>
+                                  
+                                  {/* 小分類選択後のレベルボタン */}
+                                  {expandedCategory === subCategory && (
+                                    <div style={{
+                                      marginTop: 4,
+                                      marginLeft: 16,
+                                      display: 'flex',
+                                      flexDirection: 'row',
+                                      gap: 8,
+                                    }}>
+                                      <button
+                                        style={{
+                                          background: '#90CAF9',
+                                          color: '#01579b',
+                                          border: 'none',
+                                          borderRadius: 6,
+                                          padding: '6px 10px',
+                                          fontSize: 12,
+                                          fontWeight: 'bold',
+                                          cursor: 'pointer',
+                                          textAlign: 'left',
+                                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                                          transition: 'all 0.2s ease',
+                                          width: '100%',
+                                        }}
+                                        onMouseOver={(e) => {
+                                          e.target.style.background = '#64B5F6';
+                                          e.target.style.transform = 'translateY(-1px)';
+                                        }}
+                                        onMouseOut={(e) => {
+                                          e.target.style.background = '#90CAF9';
+                                          e.target.style.transform = 'translateY(0)';
+                                        }}
+                                        onClick={() => handleLevelSelect('レベル1')}
+                                      >
+                                        基礎
+                                      </button>
+                                      <button
+                                        style={{
+                                          background: '#90CAF9',
+                                          color: '#01579b',
+                                          border: 'none',
+                                          borderRadius: 6,
+                                          padding: '6px 10px',
+                                          fontSize: 12,
+                                          fontWeight: 'bold',
+                                          cursor: 'pointer',
+                                          textAlign: 'left',
+                                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                                          transition: 'all 0.2s ease',
+                                          width: '100%',
+                                        }}
+                                        onMouseOver={(e) => {
+                                          e.target.style.background = '#64B5F6';
+                                          e.target.style.transform = 'translateY(-1px)';
+                                        }}
+                                        onMouseOut={(e) => {
+                                          e.target.style.background = '#90CAF9';
+                                          e.target.style.transform = 'translateY(0)';
+                                        }}
+                                        onClick={() => handleLevelSelect('レベル2')}
+                                      >
+                                        標準
+                                      </button>
+                                      <button
+                                        style={{
+                                          background: '#90CAF9',
+                                          color: '#01579b',
+                                          border: 'none',
+                                          borderRadius: 6,
+                                          padding: '6px 10px',
+                                          fontSize: 12,
+                                          fontWeight: 'bold',
+                                          cursor: 'pointer',
+                                          textAlign: 'left',
+                                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                                          transition: 'all 0.2s ease',
+                                          width: '100%',
+                                        }}
+                                        onMouseOver={(e) => {
+                                          e.target.style.background = '#64B5F6';
+                                          e.target.style.transform = 'translateY(-1px)';
+                                        }}
+                                        onMouseOut={(e) => {
+                                          e.target.style.background = '#90CAF9';
+                                          e.target.style.transform = 'translateY(0)';
+                                        }}
+                                        onClick={() => handleLevelSelect('レベル3')}
+                                      >
+                                        応用
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                           
                           {/* 展開されたカテゴリのレベルボタン */}
                           {expandedCategory === category && (

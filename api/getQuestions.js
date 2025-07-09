@@ -23,8 +23,8 @@ async function getQuestions() {
   const questions = res.data.values.map(row => ({
     id: row[0],
     category: row[1],
-    subCategory: row[2],
     detailCategory: row[2],
+    subCategory: row[3] || '', // D列の小分類
     question: row[4],
     answer: row[5],
     type: row[6],
